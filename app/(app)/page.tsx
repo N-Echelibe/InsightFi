@@ -6,6 +6,7 @@ import { SpendingChart } from "@/components/dashboard/spending-chart";
 import { BudgetOverview } from "@/components/dashboard/budget-overview";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsGoals } from "@/components/dashboard/savings-goals";
+import { InsightsCard } from "@/components/dashboard/insights-card";
 import {
   Wallet,
   TrendingUp,
@@ -38,27 +39,30 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Balance"
-          value="$144,798.57"
+          value={144798.57}
           change="+2.5% from last month"
           trend="up"
           icon={Wallet}
           iconColor="bg-primary/10 text-primary"
+          isCurrency={true}
         />
         <StatCard
           title="Monthly Income"
-          value="$8,450.00"
+          value={8450.0}
           change="+12.3% from last month"
           trend="up"
           icon={TrendingUp}
           iconColor="bg-success/10 text-success"
+          isCurrency={true}
         />
         <StatCard
           title="Monthly Expenses"
-          value="$5,230.45"
+          value={5230.45}
           change="+5.2% from last month"
           trend="down"
           icon={TrendingDown}
           iconColor="bg-destructive/10 text-destructive"
+          isCurrency={true}
         />
         <StatCard
           title="Savings Rate"
@@ -68,6 +72,12 @@ export default function DashboardPage() {
           icon={PiggyBank}
           iconColor="bg-chart-4/10 text-chart-4"
         />
+      </div>
+
+      {/* Insights Section */}
+      <div>
+        <h2 className="text-xl font-bold tracking-tight mb-4">Financial Insights</h2>
+        <InsightsCard />
       </div>
 
       {/* Main Content Grid */}

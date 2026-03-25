@@ -80,7 +80,7 @@ export function SpendingChart() {
                 tick={{ fontSize: 12 }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `$${value / 1000}k`}
+                tickFormatter={(value) => `₦${value / 1000}k`}
                 className="text-muted-foreground"
               />
               <Tooltip
@@ -90,7 +90,7 @@ export function SpendingChart() {
                   borderRadius: "8px",
                   fontSize: "12px",
                 }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
+                formatter={(value: number) => [`₦${value.toLocaleString("en-NG")}`, ""]}
               />
               <Area
                 type="monotone"

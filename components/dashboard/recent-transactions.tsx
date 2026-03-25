@@ -101,7 +101,7 @@ export function RecentTransactions() {
                   )}
                 >
                   {transaction.amount > 0 ? "+" : ""}
-                  ${Math.abs(transaction.amount).toFixed(2)}
+                  ₦{Math.abs(transaction.amount).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {transaction.date}

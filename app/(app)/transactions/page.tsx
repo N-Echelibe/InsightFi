@@ -142,8 +142,43 @@ const transactions = [
 export default function TransactionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("all");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const searchParams = useSearchParams();
+
+  // Helper function to check if transaction is within date range
+  const isWithinDateRange = (transactionDate: string): boolean => {
+    const txDate = new Date(transactionDate);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    const ninetyDaysAgo = new Date(today);
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    ninetyDaysAgo.setHours(0, 0, 0, 0);
+
+    const sixMonthsAgo = new Date(today);
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    sixMonthsAgo.setHours(0, 0, 0, 0);
+
+    switch (dateFilter) {
+      case "7d":
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        return txDate >= sevenDaysAgo && txDate <= today;
+      case "30d":
+        return txDate >= thirtyDaysAgo && txDate <= today;
+      case "90d":
+        return txDate >= ninetyDaysAgo && txDate <= today;
+      case "6m":
+        return txDate >= sixMonthsAgo && txDate <= today;
+      default:
+        return true;
+    }
+  };
 
   const filteredTransactions = transactions.filter((t) => {
     const matchesSearch = t.name
@@ -151,7 +186,8 @@ export default function TransactionsPage() {
       .includes(searchQuery.toLowerCase());
     const matchesCategory =
       categoryFilter === "all" || t.category === categoryFilter;
-    return matchesSearch && matchesCategory;
+    const matchesDate = isWithinDateRange(t.date);
+    return matchesSearch && matchesCategory && matchesDate;
   });
 
   return (
@@ -185,6 +221,18 @@ export default function TransactionsPage() {
                 className="pl-9"
               />
             </div>
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="w-full sm:w-[150px]">
+                <SelectValue placeholder="Date Range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="7d">Last 7 Days</SelectItem>
+                <SelectItem value="30d">Last 30 Days</SelectItem>
+                <SelectItem value="90d">Last 90 Days</SelectItem>
+                <SelectItem value="6m">Last 6 Months</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
@@ -275,8 +323,8 @@ export default function TransactionsPage() {
                         transaction.amount > 0 ? "text-success" : ""
                       )}
                     >
-                      {transaction.amount > 0 ? "+" : ""}$
-                      {Math.abs(transaction.amount).toFixed(2)}
+                      {transaction.amount > 0 ? "+" : ""}₦
+                      {Math.abs(transaction.amount).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
