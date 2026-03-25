@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus,
-  Sparkles,
   TrendingUp,
   TrendingDown,
   AlertTriangle,
@@ -27,7 +26,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BudgetDialog } from "@/components/budgets/budget-dialog";
-import { AIPredictions } from "@/components/budgets/ai-predictions";
 import { SavingsBuckets } from "@/components/budgets/savings-buckets";
 import {
   PieChart,
@@ -228,10 +226,6 @@ export default function BudgetsPage() {
         <TabsList>
           <TabsTrigger value="budgets">Budgets</TabsTrigger>
           <TabsTrigger value="savings">Savings Buckets</TabsTrigger>
-          <TabsTrigger value="predictions" className="gap-2">
-            <Sparkles className="h-4 w-4" />
-            AI Predictions
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="budgets" className="space-y-6">
@@ -365,10 +359,6 @@ export default function BudgetsPage() {
 
         <TabsContent value="savings">
           <SavingsBuckets />
-        </TabsContent>
-
-        <TabsContent value="predictions">
-          <AIPredictions />
         </TabsContent>
       </Tabs>
 

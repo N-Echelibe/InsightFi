@@ -32,9 +32,7 @@ import {
   Search,
   Filter,
   Download,
-  Upload,
   MoreHorizontal,
-  Sparkles,
   Coffee,
   ShoppingBag,
   Car,
@@ -47,8 +45,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddTransactionDialog } from "@/components/transactions/add-transaction-dialog";
-import { AITransactionInput } from "@/components/transactions/ai-transaction-input";
-import { ImportDialog } from "@/components/transactions/import-dialog";
 import { useSearchParams } from "next/navigation";
 import Loading from "./loading";
 
@@ -147,7 +143,6 @@ export default function TransactionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const searchParams = useSearchParams();
 
   const filteredTransactions = transactions.filter((t) => {
@@ -170,23 +165,12 @@ export default function TransactionsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="gap-2 bg-transparent"
-            onClick={() => setImportDialogOpen(true)}
-          >
-            <Upload className="h-4 w-4" />
-            Import
-          </Button>
           <Button className="gap-2" onClick={() => setAddDialogOpen(true)}>
             <Plus className="h-4 w-4" />
             Add Transaction
           </Button>
         </div>
       </div>
-
-      {/* AI Input Card */}
-      <AITransactionInput />
 
       {/* Filters */}
       <Card>
@@ -327,7 +311,6 @@ export default function TransactionsPage() {
 
       {/* Dialogs */}
       <AddTransactionDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
-      <ImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
     </div>
   );
 }

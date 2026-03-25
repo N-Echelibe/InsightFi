@@ -9,7 +9,6 @@ import {
   PiggyBank,
   TrendingUp,
   FileBarChart,
-  MessageSquareText,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -43,11 +42,6 @@ const navItems = [
     title: "Reports",
     href: "/reports",
     icon: FileBarChart,
-  },
-  {
-    title: "AI Assistant",
-    href: "/ai-assistant",
-    icon: MessageSquareText,
   },
   {
     title: "Settings",
