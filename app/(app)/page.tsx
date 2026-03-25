@@ -74,12 +74,6 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Insights Section */}
-      <div className="pt-2">
-        <h2 className="text-lg font-bold tracking-tight mb-5">Financial Insights</h2>
-        <InsightsCard />
-      </div>
-
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column - Charts */}
@@ -95,6 +89,9 @@ export default function DashboardPage() {
           <SavingsGoals />
         </div>
       </div>
+
+      {/* Financial Insights Section */}
+      <InsightsCard />
     </div>
   );
 }
