@@ -18,14 +18,14 @@ import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-3xl font-bold tracking-tight">
             Good morning, John
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mt-1">
             {"Here's your financial overview for today"}
           </p>
         </div>
@@ -36,7 +36,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
           title="Total Balance"
           value={144798.57}
@@ -75,21 +75,21 @@ export default function DashboardPage() {
       </div>
 
       {/* Insights Section */}
-      <div>
-        <h2 className="text-xl font-bold tracking-tight mb-4">Financial Insights</h2>
+      <div className="pt-2">
+        <h2 className="text-lg font-bold tracking-tight mb-5">Financial Insights</h2>
         <InsightsCard />
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column - Charts */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-8">
           <SpendingChart />
           <RecentTransactions />
         </div>
 
         {/* Right Column - Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           <AccountsCard />
           <BudgetOverview />
           <SavingsGoals />

@@ -47,17 +47,17 @@ export function InsightsCard() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Spending Breakdown */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
             Spending Breakdown
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {categorySpending.map((category) => (
               <div key={category.label}>
                 <div className="flex items-center justify-between mb-1">
@@ -80,42 +80,42 @@ export function InsightsCard() {
 
       {/* Classification & Key Insights */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
             Financial Profile
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-4 bg-muted/50 rounded-lg">
-            <p className="text-sm text-muted-foreground mb-1">
+        <CardContent className="space-y-3">
+          <div className="p-3 bg-muted/40 rounded-lg">
+            <p className="text-xs text-muted-foreground mb-1">
               Spending Classification
             </p>
-            <p className={cn("text-xl font-bold", classificationColor)}>
+            <p className={cn("text-lg font-bold", classificationColor)}>
               {classification}
             </p>
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="text-xs text-muted-foreground mt-1.5">
               You&apos;re spending {spendingRate.toFixed(1)}% of your income
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 bg-muted/50 rounded-lg">
-              <p className="text-xs text-muted-foreground mb-1">
+            <div className="p-3 bg-muted/40 rounded-lg">
+              <p className="text-xs text-muted-foreground mb-0.5">
                 Monthly Expenses
               </p>
-              <p className="text-lg font-bold text-destructive">
+              <p className="text-base font-bold text-destructive">
                 ₦{totalSpending.toLocaleString("en-NG", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </p>
             </div>
-            <div className="p-3 bg-muted/50 rounded-lg">
-              <p className="text-xs text-muted-foreground mb-1">
+            <div className="p-3 bg-muted/40 rounded-lg">
+              <p className="text-xs text-muted-foreground mb-0.5">
                 Savings Rate
               </p>
-              <p className="text-lg font-bold text-success">
+              <p className="text-base font-bold text-success">
                 {(100 - spendingRate).toFixed(0)}%
               </p>
             </div>
@@ -129,10 +129,10 @@ export function InsightsCard() {
           "border-2",
           daysUntilRunout < 30 ? "border-destructive bg-destructive/5" : "border-amber-500/50 bg-amber-500/5"
         )}>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4">
             <div className="flex gap-3">
               <Clock className={cn(
-                "h-5 w-5 flex-shrink-0 mt-0.5",
+                "h-4 w-4 flex-shrink-0 mt-0.5",
                 daysUntilRunout < 30 ? "text-destructive" : "text-amber-600"
               )} />
               <div>
@@ -143,7 +143,7 @@ export function InsightsCard() {
                   Cash Runway Alert
                 </p>
                 <p className={cn(
-                  "text-sm mt-1",
+                  "text-xs mt-0.5",
                   daysUntilRunout < 30 ? "text-destructive/80" : "text-amber-600/80"
                 )}>
                   At your current spending rate, you may run out of funds in{" "}
@@ -157,14 +157,14 @@ export function InsightsCard() {
 
       {/* Recommendations */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Lightbulb className="h-5 w-5" />
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Lightbulb className="h-4 w-4" />
             Recommendations
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-3">
+          <ul className="space-y-2.5">
             <li className="flex gap-3 text-sm">
               <span className="text-primary font-bold">1.</span>
               <span>
