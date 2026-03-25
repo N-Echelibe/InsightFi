@@ -1,9 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  AlertTriangle,
   TrendingUp,
   Lightbulb,
   Clock,
@@ -127,20 +125,34 @@ export function InsightsCard() {
 
       {/* Runway Warning */}
       {daysUntilRunout < 90 && (
-        <Alert className={cn(
-          daysUntilRunout < 30 ? "border-destructive bg-destructive/10" : "border-amber-500 bg-amber-500/10"
+        <Card className={cn(
+          "border-2",
+          daysUntilRunout < 30 ? "border-destructive bg-destructive/5" : "border-amber-500/50 bg-amber-500/5"
         )}>
-          <Clock className={cn(
-            "h-4 w-4",
-            daysUntilRunout < 30 ? "text-destructive" : "text-amber-500"
-          )} />
-          <AlertDescription className={cn(
-            daysUntilRunout < 30 ? "text-destructive" : "text-amber-600"
-          )}>
-            At your current spending rate, you may run out of funds in{" "}
-            <span className="font-semibold">{daysUntilRunout} days</span>
-          </AlertDescription>
-        </Alert>
+          <CardContent className="pt-6">
+            <div className="flex gap-3">
+              <Clock className={cn(
+                "h-5 w-5 flex-shrink-0 mt-0.5",
+                daysUntilRunout < 30 ? "text-destructive" : "text-amber-600"
+              )} />
+              <div>
+                <p className={cn(
+                  "font-semibold text-sm",
+                  daysUntilRunout < 30 ? "text-destructive" : "text-amber-700"
+                )}>
+                  Cash Runway Alert
+                </p>
+                <p className={cn(
+                  "text-sm mt-1",
+                  daysUntilRunout < 30 ? "text-destructive/80" : "text-amber-600/80"
+                )}>
+                  At your current spending rate, you may run out of funds in{" "}
+                  <span className="font-semibold">{daysUntilRunout} days</span>
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Recommendations */}
