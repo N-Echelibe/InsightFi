@@ -46,6 +46,7 @@ const budgets = [
     color: "#22c55e",
     bgColor: "bg-emerald-500/10 text-emerald-500",
     alerts: true,
+    type: "recurring" as const,
   },
   {
     id: 2,
@@ -56,6 +57,7 @@ const budgets = [
     color: "#3b82f6",
     bgColor: "bg-blue-500/10 text-blue-500",
     alerts: true,
+    type: "recurring" as const,
   },
   {
     id: 3,
@@ -66,6 +68,7 @@ const budgets = [
     color: "#f97316",
     bgColor: "bg-orange-500/10 text-orange-500",
     alerts: true,
+    type: "recurring" as const,
   },
   {
     id: 4,
@@ -76,6 +79,7 @@ const budgets = [
     color: "#8b5cf6",
     bgColor: "bg-violet-500/10 text-violet-500",
     alerts: false,
+    type: "recurring" as const,
   },
   {
     id: 5,
@@ -86,6 +90,7 @@ const budgets = [
     color: "#06b6d4",
     bgColor: "bg-cyan-500/10 text-cyan-500",
     alerts: true,
+    type: "recurring" as const,
   },
   {
     id: 6,
@@ -96,6 +101,7 @@ const budgets = [
     color: "#ec4899",
     bgColor: "bg-pink-500/10 text-pink-500",
     alerts: false,
+    type: "recurring" as const,
   },
   {
     id: 7,
@@ -106,6 +112,7 @@ const budgets = [
     color: "#eab308",
     bgColor: "bg-yellow-500/10 text-yellow-500",
     alerts: true,
+    type: "recurring" as const,
   },
   {
     id: 8,
@@ -116,6 +123,9 @@ const budgets = [
     color: "#14b8a6",
     bgColor: "bg-teal-500/10 text-teal-500",
     alerts: false,
+    type: "onetime" as const,
+    startDate: new Date(2025, 2, 1),
+    endDate: new Date(2025, 2, 15),
   },
 ];
 
@@ -125,6 +135,46 @@ const chartData = budgets.map((b) => ({
   color: b.color,
 }));
 
+function calculateProjectedSpending(budget: (typeof budgets)[0]): {
+  projected: number;
+  status: "on-track" | "warning" | "over";
+  daysRemaining?: number;
+} {
+  if (budget.type === "onetime" && budget.startDate && budget.endDate) {
+    const today = new Date();
+    const totalDays = Math.ceil(
+      (budget.endDate.getTime() - budget.startDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const daysElapsed = Math.ceil(
+      (today.getTime() - budget.startDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const daysRemaining = Math.max(0, totalDays - daysElapsed);
+
+    if (daysElapsed <= 0) {
+      return { projected: budget.spent, status: "on-track", daysRemaining: totalDays };
+    }
+
+    const dailyRate = budget.spent / Math.max(1, daysElapsed);
+    const projected = dailyRate * totalDays;
+
+    if (projected > budget.budget * 1.1) {
+      return { projected, status: "over", daysRemaining };
+    } else if (projected > budget.budget * 0.9) {
+      return { projected, status: "warning", daysRemaining };
+    }
+    return { projected, status: "on-track", daysRemaining };
+  }
+
+  // For recurring budgets, compare against budget
+  const percentage = (budget.spent / budget.budget) * 100;
+  if (percentage > 100) {
+    return { projected: budget.spent, status: "over" };
+  } else if (percentage >= 80) {
+    return { projected: budget.spent, status: "warning" };
+  }
+  return { projected: budget.spent, status: "on-track" };
+}
+
 export default function BudgetsPage() {
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [selectedBudget, setSelectedBudget] = useState<(typeof budgets)[0] | null>(
@@ -133,7 +183,10 @@ export default function BudgetsPage() {
 
   const totalBudget = budgets.reduce((sum, b) => sum + b.budget, 0);
   const totalSpent = budgets.reduce((sum, b) => sum + b.spent, 0);
-  const overBudgetItems = budgets.filter((b) => b.spent > b.budget);
+  const overBudgetItems = budgets.filter((b) => {
+    const result = calculateProjectedSpending(b);
+    return result.status === "over";
+  });
 
   return (
     <div className="space-y-6">
@@ -160,7 +213,10 @@ export default function BudgetsPage() {
                 <p className="text-sm font-medium text-muted-foreground">
                   Total Budget
                 </p>
-                <p className="text-2xl font-bold">${totalBudget.toLocaleString()}</p>
+                <p className="text-2xl font-bold">₦{totalBudget.toLocaleString("en-NG", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })}</p>
               </div>
               <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
                 <Target className="h-5 w-5" />
@@ -176,7 +232,10 @@ export default function BudgetsPage() {
                 <p className="text-sm font-medium text-muted-foreground">
                   Total Spent
                 </p>
-                <p className="text-2xl font-bold">${totalSpent.toLocaleString()}</p>
+                <p className="text-2xl font-bold">₦{totalSpent.toLocaleString("en-NG", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })}</p>
               </div>
               <div className="p-2.5 rounded-lg bg-chart-2/10 text-chart-2">
                 <TrendingDown className="h-5 w-5" />
@@ -193,7 +252,10 @@ export default function BudgetsPage() {
                   Remaining
                 </p>
                 <p className="text-2xl font-bold text-success">
-                  ${(totalBudget - totalSpent).toLocaleString()}
+                  ₦{(totalBudget - totalSpent).toLocaleString("en-NG", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  })}
                 </p>
               </div>
               <div className="p-2.5 rounded-lg bg-success/10 text-success">
@@ -234,15 +296,17 @@ export default function BudgetsPage() {
             <div className="lg:col-span-2 space-y-4">
               {budgets.map((budget) => {
                 const percentage = Math.round((budget.spent / budget.budget) * 100);
-                const isOverBudget = percentage > 100;
-                const isWarning = percentage >= 80 && percentage < 100;
+                const projectionData = calculateProjectedSpending(budget);
+                const isOverBudget = projectionData.status === "over";
+                const isWarning = projectionData.status === "warning";
 
                 return (
                   <Card
                     key={budget.id}
                     className={cn(
                       "hover:shadow-md transition-shadow cursor-pointer",
-                      isOverBudget && "border-destructive/50"
+                      isOverBudget && "border-destructive/50",
+                      isWarning && "border-amber-500/30"
                     )}
                     onClick={() => {
                       setSelectedBudget(budget);
@@ -256,10 +320,22 @@ export default function BudgetsPage() {
                             <budget.icon className="h-5 w-5" />
                           </div>
                           <div>
-                            <p className="font-medium">{budget.category}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{budget.category}</p>
+                              {budget.type === "onetime" && (
+                                <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded">
+                                  One-Time
+                                </span>
+                              )}
+                            </div>
                             <p className="text-sm text-muted-foreground">
-                              ${budget.spent} of ${budget.budget}
+                              ₦{budget.spent.toLocaleString()} of ₦{budget.budget.toLocaleString()}
                             </p>
+                            {budget.type === "onetime" && projectionData.daysRemaining !== undefined && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {projectionData.daysRemaining} days remaining
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -276,26 +352,38 @@ export default function BudgetsPage() {
                           {isWarning && (
                             <Badge
                               variant="secondary"
-                              className="text-xs bg-warning/10 text-warning"
+                              className="text-xs bg-amber-500/10 text-amber-700"
                             >
                               Warning
                             </Badge>
                           )}
                         </div>
                       </div>
+
+                      {budget.type === "onetime" && (
+                        <div className="mb-3 p-2 bg-muted/50 rounded text-xs">
+                          <p className="text-muted-foreground">
+                            Projected: ₦{projectionData.projected.toLocaleString("en-NG", {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            })}
+                          </p>
+                        </div>
+                      )}
+
                       <div className="space-y-1">
                         <Progress
                           value={Math.min(percentage, 100)}
                           className={cn(
                             "h-2",
                             isOverBudget && "[&>div]:bg-destructive",
-                            isWarning && "[&>div]:bg-warning"
+                            isWarning && "[&>div]:bg-amber-500"
                           )}
                         />
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <span>{percentage}% used</span>
                           <span>
-                            ${(budget.budget - budget.spent).toLocaleString()}{" "}
+                            ₦{(budget.budget - budget.spent).toLocaleString()}{" "}
                             {isOverBudget ? "over" : "left"}
                           </span>
                         </div>

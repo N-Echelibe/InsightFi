@@ -21,7 +21,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Bell } from "lucide-react";
+import { Bell, CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface Budget {
   id: number;
@@ -29,6 +37,9 @@ interface Budget {
   spent: number;
   budget: number;
   alerts: boolean;
+  type?: "recurring" | "onetime";
+  startDate?: Date;
+  endDate?: Date;
 }
 
 interface BudgetDialogProps {
@@ -42,17 +53,26 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
   const [amount, setAmount] = useState("");
   const [alertEnabled, setAlertEnabled] = useState(true);
   const [alertThreshold, setAlertThreshold] = useState([80]);
+  const [budgetType, setBudgetType] = useState<"recurring" | "onetime">("recurring");
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
 
   useEffect(() => {
     if (budget) {
       setCategory(budget.category);
       setAmount(budget.budget.toString());
       setAlertEnabled(budget.alerts);
+      setBudgetType(budget.type || "recurring");
+      setStartDate(budget.startDate || null);
+      setEndDate(budget.endDate || null);
     } else {
       setCategory("");
       setAmount("");
       setAlertEnabled(true);
       setAlertThreshold([80]);
+      setBudgetType("recurring");
+      setStartDate(null);
+      setEndDate(null);
     }
   }, [budget]);
 
@@ -95,10 +115,23 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="amount">Monthly Budget</Label>
+            <Label>Budget Type</Label>
+            <Select value={budgetType} onValueChange={(value: any) => setBudgetType(value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recurring">Monthly (Recurring)</SelectItem>
+                <SelectItem value="onetime">One-Time / Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="amount">{budgetType === "recurring" ? "Monthly" : "Total"} Budget</Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                $
+                ₦
               </span>
               <Input
                 id="amount"
@@ -110,6 +143,62 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
               />
             </div>
           </div>
+
+          {budgetType === "onetime" && (
+            <>
+              <div className="grid gap-2">
+                <Label>Start Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !startDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate ? format(startDate, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={startDate || undefined}
+                      onSelect={setStartDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>End Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !endDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {endDate ? format(endDate, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={endDate || undefined}
+                      onSelect={setEndDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </>
+          )}
 
           <div className="space-y-4 pt-2">
             <div className="flex items-center justify-between">
