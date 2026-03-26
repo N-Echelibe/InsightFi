@@ -27,6 +27,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { format } from "date-fns";
 import {
   Plus,
   Search,
@@ -42,6 +49,7 @@ import {
   Edit,
   Trash2,
   Tag,
+  CalendarIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddTransactionDialog } from "@/components/transactions/add-transaction-dialog";
@@ -143,8 +151,8 @@ export default function TransactionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
-  const [customDateStart, setCustomDateStart] = useState("");
-  const [customDateEnd, setCustomDateEnd] = useState("");
+  const [customDateStart, setCustomDateStart] = useState<Date | null>(null);
+  const [customDateEnd, setCustomDateEnd] = useState<Date | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const searchParams = useSearchParams();
@@ -287,28 +295,57 @@ export default function TransactionsPage() {
           {/* Custom Date Range Inputs */}
           {dateFilter === "custom" && (
             <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <Input
-                  type="date"
-                  value={customDateStart}
-                  onChange={(e) => {
-                    setCustomDateStart(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="Start Date"
-                />
-              </div>
-              <div className="flex-1">
-                <Input
-                  type="date"
-                  value={customDateEnd}
-                  onChange={(e) => {
-                    setCustomDateEnd(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="End Date"
-                />
-              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "flex-1 justify-start text-left font-normal",
+                      !customDateStart && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customDateStart ? format(customDateStart, "PPP") : <span>Start Date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={customDateStart || undefined}
+                    onSelect={(d) => {
+                      setCustomDateStart(d || null);
+                      setCurrentPage(1);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "flex-1 justify-start text-left font-normal",
+                      !customDateEnd && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customDateEnd ? format(customDateEnd, "PPP") : <span>End Date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={customDateEnd || undefined}
+                    onSelect={(d) => {
+                      setCustomDateEnd(d || null);
+                      setCurrentPage(1);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           )}
         </CardContent>
