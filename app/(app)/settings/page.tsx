@@ -24,7 +24,6 @@ import {
   Shield,
   Palette,
   CreditCard,
-  Link2,
   Download,
   Trash2,
   Camera,
@@ -32,6 +31,10 @@ import {
   Moon,
   Monitor,
   Check,
+  Tag,
+  Plus,
+  Edit,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +48,49 @@ export default function SettingsPage() {
     marketUpdates: true,
     newsletter: false,
   });
+  const [accounts, setAccounts] = useState([
+    { id: 1, name: "Cash", type: "cash" },
+    { id: 2, name: "Savings Account", type: "savings" },
+    { id: 3, name: "Current Account", type: "current" },
+  ]);
+  const [newAccountName, setNewAccountName] = useState("");
+  const [newAccountType, setNewAccountType] = useState("cash");
+  
+  const [categories, setCategories] = useState([
+    "Food & Dining",
+    "Transportation",
+    "Shopping",
+    "Housing",
+    "Subscriptions",
+    "Income",
+  ]);
+  const [newCategory, setNewCategory] = useState("");
+
+  const addAccount = () => {
+    if (newAccountName.trim()) {
+      setAccounts([
+        ...accounts,
+        { id: Date.now(), name: newAccountName, type: newAccountType },
+      ]);
+      setNewAccountName("");
+      setNewAccountType("cash");
+    }
+  };
+
+  const deleteAccount = (id: number) => {
+    setAccounts(accounts.filter((acc) => acc.id !== id));
+  };
+
+  const addCategory = () => {
+    if (newCategory.trim() && !categories.includes(newCategory)) {
+      setCategories([...categories, newCategory]);
+      setNewCategory("");
+    }
+  };
+
+  const deleteCategory = (category: string) => {
+    setCategories(categories.filter((c) => c !== category));
+  };
 
   return (
     <div className="space-y-6">
@@ -62,17 +108,17 @@ export default function SettingsPage() {
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Profile</span>
           </TabsTrigger>
+          <TabsTrigger value="accounts" className="gap-2 py-2">
+            <CreditCard className="h-4 w-4" />
+            <span className="hidden sm:inline">Accounts</span>
+          </TabsTrigger>
+          <TabsTrigger value="categories" className="gap-2 py-2">
+            <Tag className="h-4 w-4" />
+            <span className="hidden sm:inline">Categories</span>
+          </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2 py-2">
             <Bell className="h-4 w-4" />
             <span className="hidden sm:inline">Notifications</span>
-          </TabsTrigger>
-          <TabsTrigger value="appearance" className="gap-2 py-2">
-            <Palette className="h-4 w-4" />
-            <span className="hidden sm:inline">Appearance</span>
-          </TabsTrigger>
-          <TabsTrigger value="connected" className="gap-2 py-2">
-            <Link2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Connected</span>
           </TabsTrigger>
           <TabsTrigger value="security" className="gap-2 py-2">
             <Shield className="h-4 w-4" />
@@ -138,11 +184,12 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Currency</Label>
-                    <Select defaultValue="usd">
+                    <Select defaultValue="ngn">
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="ngn">NGN (₦)</SelectItem>
                         <SelectItem value="usd">USD ($)</SelectItem>
                         <SelectItem value="eur">EUR (&euro;)</SelectItem>
                         <SelectItem value="gbp">GBP (&pound;)</SelectItem>
@@ -336,87 +383,125 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* Connected Accounts Tab */}
-        <TabsContent value="connected" className="space-y-6">
+        {/* Accounts Tab */}
+        <TabsContent value="accounts" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Connected Accounts</CardTitle>
+              <CardTitle>Manage Accounts</CardTitle>
               <CardDescription>
-                Manage your connected bank accounts and services
+                Create and manage your bank accounts
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {[
-                {
-                  name: "Chase Bank",
-                  type: "Checking & Savings",
-                  status: "connected",
-                  lastSync: "2 hours ago",
-                },
-                {
-                  name: "Ally Bank",
-                  type: "Savings",
-                  status: "connected",
-                  lastSync: "1 day ago",
-                },
-                {
-                  name: "Amex",
-                  type: "Credit Card",
-                  status: "connected",
-                  lastSync: "3 hours ago",
-                },
-                {
-                  name: "Fidelity",
-                  type: "Investment",
-                  status: "needs_attention",
-                  lastSync: "7 days ago",
-                },
-              ].map((account) => (
-                <div
-                  key={account.name}
-                  className="flex items-center justify-between p-4 rounded-lg border"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                      <CreditCard className="h-5 w-5 text-muted-foreground" />
+            <CardContent className="space-y-6">
+              {/* Add Account */}
+              <div className="space-y-4">
+                <h4 className="font-medium">Add New Account</h4>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Input
+                    placeholder="Account name (e.g., My Savings)"
+                    value={newAccountName}
+                    onChange={(e) => setNewAccountName(e.target.value)}
+                    onKeyPress={(e) => e.key === "Enter" && addAccount()}
+                  />
+                  <Select value={newAccountType} onValueChange={setNewAccountType}>
+                    <SelectTrigger className="w-full sm:w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="savings">Savings</SelectItem>
+                      <SelectItem value="current">Current</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={addAccount} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Accounts List */}
+              <div className="space-y-3">
+                <h4 className="font-medium">Your Accounts</h4>
+                {accounts.map((account) => (
+                  <div
+                    key={account.id}
+                    className="flex items-center justify-between p-4 rounded-lg border"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                        <CreditCard className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{account.name}</p>
+                        <p className="text-xs text-muted-foreground capitalize">
+                          {account.type} Account
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{account.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {account.type}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <Badge
-                        variant={
-                          account.status === "connected" ? "default" : "destructive"
-                        }
-                        className={cn(
-                          account.status === "connected" &&
-                            "bg-success/10 text-success hover:bg-success/20"
-                        )}
-                      >
-                        {account.status === "connected"
-                          ? "Connected"
-                          : "Needs Attention"}
-                      </Badge>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Last sync: {account.lastSync}
-                      </p>
-                    </div>
-                    <Button variant="ghost" size="sm">
-                      Manage
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteAccount(account.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              <Button variant="outline" className="w-full gap-2 mt-4 bg-transparent">
-                <Link2 className="h-4 w-4" />
-                Connect New Account
-              </Button>
+        {/* Categories Tab */}
+        <TabsContent value="categories" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Manage Categories</CardTitle>
+              <CardDescription>
+                Create and organize transaction categories
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Add Category */}
+              <div className="space-y-4">
+                <h4 className="font-medium">Add New Category</h4>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Input
+                    placeholder="Category name (e.g., Groceries)"
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    onKeyPress={(e) => e.key === "Enter" && addCategory()}
+                  />
+                  <Button onClick={addCategory} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Categories List */}
+              <div className="space-y-2">
+                <h4 className="font-medium">Your Categories</h4>
+                <div className="flex flex-wrap gap-2">
+                  {categories.map((category) => (
+                    <Badge key={category} variant="secondary" className="gap-2 py-1.5">
+                      {category}
+                      <button
+                        onClick={() => deleteCategory(category)}
+                        className="hover:bg-background/20 rounded p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

@@ -143,8 +143,12 @@ export default function TransactionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
+  const [customDateStart, setCustomDateStart] = useState("");
+  const [customDateEnd, setCustomDateEnd] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const searchParams = useSearchParams();
+  const itemsPerPage = 10;
 
   // Helper function to check if transaction is within date range
   const isWithinDateRange = (transactionDate: string): boolean => {
@@ -163,6 +167,13 @@ export default function TransactionsPage() {
     const sixMonthsAgo = new Date(today);
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     sixMonthsAgo.setHours(0, 0, 0, 0);
+
+    if (dateFilter === "custom" && customDateStart && customDateEnd) {
+      const startDate = new Date(customDateStart);
+      const endDate = new Date(customDateEnd);
+      endDate.setHours(23, 59, 59, 999);
+      return txDate >= startDate && txDate <= endDate;
+    }
 
     switch (dateFilter) {
       case "7d":
@@ -190,6 +201,15 @@ export default function TransactionsPage() {
     return matchesSearch && matchesCategory && matchesDate;
   });
 
+  // Pagination
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const startIdx = (currentPage - 1) * itemsPerPage;
+  const paginatedTransactions = filteredTransactions.slice(startIdx, startIdx + itemsPerPage);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -210,18 +230,24 @@ export default function TransactionsPage() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search transactions..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="pl-9"
               />
             </div>
-            <Select value={dateFilter} onValueChange={setDateFilter}>
+            <Select value={dateFilter} onValueChange={(value) => {
+              setDateFilter(value);
+              setCurrentPage(1);
+            }}>
               <SelectTrigger className="w-full sm:w-[150px]">
                 <SelectValue placeholder="Date Range" />
               </SelectTrigger>
@@ -231,9 +257,13 @@ export default function TransactionsPage() {
                 <SelectItem value="30d">Last 30 Days</SelectItem>
                 <SelectItem value="90d">Last 90 Days</SelectItem>
                 <SelectItem value="6m">Last 6 Months</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select value={categoryFilter} onValueChange={(value) => {
+              setCategoryFilter(value);
+              setCurrentPage(1);
+            }}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Category" />
@@ -253,6 +283,34 @@ export default function TransactionsPage() {
               Export
             </Button>
           </div>
+
+          {/* Custom Date Range Inputs */}
+          {dateFilter === "custom" && (
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <Input
+                  type="date"
+                  value={customDateStart}
+                  onChange={(e) => {
+                    setCustomDateStart(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Start Date"
+                />
+              </div>
+              <div className="flex-1">
+                <Input
+                  type="date"
+                  value={customDateEnd}
+                  onChange={(e) => {
+                    setCustomDateEnd(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="End Date"
+                />
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -276,7 +334,7 @@ export default function TransactionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTransactions.map((transaction) => (
+                {paginatedTransactions.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -354,6 +412,46 @@ export default function TransactionsPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6 pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                Showing {startIdx + 1} to {Math.min(startIdx + itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePageChange(page)}
+                      className={cn(currentPage === page && "bg-primary")}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
