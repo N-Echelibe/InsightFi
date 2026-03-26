@@ -8,7 +8,6 @@ import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsGoals } from "@/components/dashboard/savings-goals";
 import {
   FinancialProfileCard,
-  KeyMetricsCard,
   SpendingBreakdownCard,
   CashRunwayAlertCard,
   SmartRecommendationsCard,
@@ -93,7 +92,6 @@ export default function DashboardPage() {
         {/* Right Column - Sidebar */}
         <div className="space-y-8">
           <FinancialProfileCard />
-          <KeyMetricsCard />
           <AccountsCard />
           <BudgetOverview />
           <SavingsGoals />
