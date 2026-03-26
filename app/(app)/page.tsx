@@ -6,13 +6,7 @@ import { SpendingChart } from "@/components/dashboard/spending-chart";
 import { BudgetOverview } from "@/components/dashboard/budget-overview";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsGoals } from "@/components/dashboard/savings-goals";
-import {
-  FinancialProfileCard,
-  KeyMetricsCard,
-  SpendingBreakdownCard,
-  CashRunwayAlertCard,
-  SmartRecommendationsCard,
-} from "@/components/dashboard/insights-card";
+import { InsightsCard } from "@/components/dashboard/insights-card";
 import {
   Wallet,
   TrendingUp,
@@ -81,29 +75,23 @@ export default function DashboardPage() {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Left Column - Charts & Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column - Charts */}
         <div className="lg:col-span-2 space-y-8">
           <SpendingChart />
           <RecentTransactions />
-          <SpendingBreakdownCard />
-          <SmartRecommendationsCard />
-        </div>
-
-        {/* Middle Column - Profile & Metrics */}
-        <div className="space-y-8">
-          <FinancialProfileCard />
-          <CashRunwayAlertCard />
         </div>
 
         {/* Right Column - Sidebar */}
         <div className="space-y-8">
-          <KeyMetricsCard />
           <AccountsCard />
           <BudgetOverview />
           <SavingsGoals />
         </div>
       </div>
+
+      {/* Financial Insights Section */}
+      <InsightsCard />
     </div>
   );
 }
