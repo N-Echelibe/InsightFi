@@ -22,14 +22,13 @@ import { ArrowLeft, Edit, Trash2, AlertTriangle, TrendingUp } from "lucide-react
 import { cn } from "@/lib/utils";
 import { BudgetDialog } from "@/components/budgets/budget-dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 // Mock budget data - in real app would come from database
 const allBudgets = [
@@ -451,20 +450,27 @@ export default function BudgetDetailPage() {
       />
 
       {/* Delete Budget Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Budget</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Budget</DialogTitle>
+            <DialogDescription>
               Are you sure you want to delete the &quot;{budget?.category}&quot; budget? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDeleteBudget} className="bg-destructive hover:bg-destructive/90">
-            Delete
-          </AlertDialogAction>
-        </AlertDialogContent>
-      </AlertDialog>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleDeleteBudget}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
