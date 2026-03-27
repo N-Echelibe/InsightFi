@@ -230,15 +230,15 @@ export default function BudgetDetailPage() {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mt-1">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{budget.category}</h1>
+            <h1 className="text-3xl font-bold">{budget.category}</h1>
             <div className="flex items-center gap-2 mt-2">
               <Badge variant="secondary" className="text-xs">
                 {typeLabels[budget.type as keyof typeof typeLabels]}
@@ -253,54 +253,42 @@ export default function BudgetDetailPage() {
           <Button variant="outline" size="icon">
             <Edit className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon" className="text-destructive hover:text-destructive">
+          <Button variant="outline" size="icon" className="text-destructive">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm font-medium text-muted-foreground mb-1">Budget</p>
-            <p className="text-2xl font-bold">₦{budget.budget.toLocaleString("en-NG", {
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0,
-            })}</p>
+            <p className="text-sm text-muted-foreground mb-1">Budget</p>
+            <p className="text-2xl font-bold">₦{budget.budget.toLocaleString("en-NG")}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm font-medium text-muted-foreground mb-1">Spent</p>
-            <p className="text-2xl font-bold text-destructive">₦{budget.spent.toLocaleString("en-NG", {
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0,
-            })}</p>
+            <p className="text-sm text-muted-foreground mb-1">Spent</p>
+            <p className="text-2xl font-bold text-destructive">₦{budget.spent.toLocaleString("en-NG")}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm font-medium text-muted-foreground mb-1">Remaining</p>
+            <p className="text-sm text-muted-foreground mb-1">Remaining</p>
             <p className={cn("text-2xl font-bold", remaining < 0 ? "text-destructive" : "text-success")}>
-              ₦{remaining.toLocaleString("en-NG", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}
+              ₦{remaining.toLocaleString("en-NG")}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm font-medium text-muted-foreground mb-1">Projected Total</p>
+            <p className="text-sm text-muted-foreground mb-1">Projected Total</p>
             <p className={cn(
               "text-2xl font-bold",
               projectionData.projected > budget.budget ? "text-destructive" : "text-success"
             )}>
-              ₦{projectionData.projected.toLocaleString("en-NG", { 
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0 
-              })}
+              ₦{projectionData.projected.toLocaleString("en-NG", { maximumFractionDigits: 0 })}
             </p>
           </CardContent>
         </Card>
@@ -308,40 +296,25 @@ export default function BudgetDetailPage() {
 
       {/* Progress */}
       <Card>
-        <CardHeader className="pb-4">
-          <CardTitle>Spending Progress</CardTitle>
+        <CardHeader>
+          <CardTitle className="text-base">Progress</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-4">
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Amount Spent</span>
-              <span className="text-sm font-bold">{percentage}%</span>
+            <div className="flex justify-between mb-2 text-sm">
+              <span>Amount Spent</span>
+              <span className="font-medium">{percentage}%</span>
             </div>
-            <Progress 
-              value={Math.min(percentage, 100)} 
-              className={cn(
-                "h-2",
-                projectionData.status === "over" && "[&>div]:bg-destructive",
-                projectionData.status === "warning" && "[&>div]:bg-amber-500"
-              )}
-            />
+            <Progress value={Math.min(percentage, 100)} className="h-3" />
           </div>
-          <div className="grid grid-cols-2 gap-4 pt-2">
+          <div className="grid grid-cols-2 gap-4 pt-4 text-sm">
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Spent</p>
-              <p className="text-lg font-bold">₦{budget.spent.toLocaleString("en-NG", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}</p>
+              <p className="text-muted-foreground">Spent</p>
+              <p className="text-lg font-semibold">₦{budget.spent.toLocaleString("en-NG")}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Remaining</p>
-              <p className={cn("text-lg font-bold", remaining < 0 ? "text-destructive" : "text-success")}>
-                ₦{remaining.toLocaleString("en-NG", {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 0,
-                })}
-              </p>
+              <p className="text-muted-foreground">Remaining</p>
+              <p className="text-lg font-semibold">₦{remaining.toLocaleString("en-NG")}</p>
             </div>
           </div>
         </CardContent>
@@ -350,23 +323,15 @@ export default function BudgetDetailPage() {
       {/* Trend Chart */}
       {trendData.length > 0 && (
         <Card>
-          <CardHeader className="pb-4">
-            <CardTitle>Spending Trend</CardTitle>
+          <CardHeader>
+            <CardTitle className="text-base">Spending Trend</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis 
-                  dataKey="day" 
-                  tick={{ fontSize: 12 }}
-                  stroke="hsl(var(--muted-foreground))"
-                />
-                <YAxis 
-                  tick={{ fontSize: 12 }}
-                  stroke="hsl(var(--muted-foreground))"
-                  tickFormatter={(value) => `₦${(value / 1000).toFixed(0)}k`}
-                />
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" />
+                <YAxis />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "hsl(var(--card))",
@@ -375,25 +340,9 @@ export default function BudgetDetailPage() {
                   }}
                   formatter={(value: number) => `₦${value.toLocaleString("en-NG")}`}
                 />
-                <Legend 
-                  wrapperStyle={{ paddingTop: "20px" }}
-                  iconType="line"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="actual" 
-                  stroke="hsl(var(--success))" 
-                  name="Actual Spending"
-                  strokeWidth={2}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="projected" 
-                  stroke="hsl(var(--chart-1))" 
-                  name="Projected"
-                  strokeDasharray="5 5"
-                  strokeWidth={2}
-                />
+                <Legend />
+                <Line type="monotone" dataKey="actual" stroke="#22c55e" name="Actual Spending" />
+                <Line type="monotone" dataKey="projected" stroke="#f97316" name="Projected" strokeDasharray="5 5" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -401,34 +350,28 @@ export default function BudgetDetailPage() {
       )}
 
       {/* Analysis */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
-          <CardHeader className="pb-4">
-            <CardTitle>Daily Analysis</CardTitle>
+          <CardHeader>
+            <CardTitle className="text-base">Daily Analysis</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Daily Average Spending</p>
-              <p className="text-2xl font-bold">₦{dailyAverage.toLocaleString("en-NG", { 
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0 
-              })}</p>
+              <p className="text-sm text-muted-foreground">Daily Average Spending</p>
+              <p className="text-2xl font-bold">₦{dailyAverage.toLocaleString("en-NG", { maximumFractionDigits: 0 })}</p>
             </div>
             {projectionData.daysElapsed !== undefined && projectionData.totalDays !== undefined && (
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Days Elapsed</p>
-                <p className="text-lg font-semibold">
-                  <span className="text-xl font-bold">{projectionData.daysElapsed}</span>
-                  <span className="text-muted-foreground"> of {projectionData.totalDays} days</span>
-                </p>
+                <p className="text-sm text-muted-foreground">Days Elapsed</p>
+                <p className="text-lg font-semibold">{projectionData.daysElapsed} of {projectionData.totalDays} days</p>
               </div>
             )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-4">
-            <CardTitle>Insights</CardTitle>
+          <CardHeader>
+            <CardTitle className="text-base">Insights</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -437,33 +380,30 @@ export default function BudgetDetailPage() {
               ) : (projectionData.daysElapsed || 0) < 2 ? (
                 <p className="text-sm text-muted-foreground">Insufficient data for accurate projections</p>
               ) : projectionData.status === "over" ? (
-                <div className="flex gap-3">
-                  <AlertTriangle className="h-5 w-5 flex-shrink-0 text-destructive" />
+                <div className="flex gap-2">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0 text-destructive mt-0.5" />
                   <div>
-                    <p className="text-sm font-semibold text-destructive">Over Budget</p>
+                    <p className="text-sm font-medium text-destructive">Over Budget</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      You&apos;ve exceeded your budget by ₦{(projectionData.projected - budget.budget).toLocaleString("en-NG", { 
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0 
-                      })}
+                      You&apos;ve exceeded your budget by ₦{(projectionData.projected - budget.budget).toLocaleString("en-NG", { maximumFractionDigits: 0 })}
                     </p>
                   </div>
                 </div>
               ) : projectionData.status === "warning" ? (
-                <div className="flex gap-3">
-                  <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-600" />
+                <div className="flex gap-2">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-600 mt-0.5" />
                   <div>
-                    <p className="text-sm font-semibold text-amber-700">Warning: Likely to Exceed</p>
+                    <p className="text-sm font-medium text-amber-700">Warning: Likely to Exceed</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       At your current spending rate, you may exceed this budget
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="flex gap-3">
-                  <TrendingUp className="h-5 w-5 flex-shrink-0 text-success" />
+                <div className="flex gap-2">
+                  <TrendingUp className="h-4 w-4 flex-shrink-0 text-success mt-0.5" />
                   <div>
-                    <p className="text-sm font-semibold text-success">On Track</p>
+                    <p className="text-sm font-medium text-success">On Track</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       You&apos;re within budget and on track
                     </p>
