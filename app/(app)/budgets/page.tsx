@@ -398,17 +398,6 @@ export default function BudgetsPage() {
                         </div>
                       </div>
 
-                      {(projectionData.daysElapsed !== undefined && projectionData.totalDays !== undefined) && (
-                        <div className="mb-3 p-2 bg-muted/50 rounded text-xs">
-                          <p className="text-muted-foreground">
-                            Projected: ₦{projectionData.projected.toLocaleString("en-NG", {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })} ({projectionData.daysElapsed} of {projectionData.totalDays} days)
-                          </p>
-                        </div>
-                      )}
-
                       <div className="space-y-1">
                         <Progress
                           value={Math.min(percentage, 100)}
