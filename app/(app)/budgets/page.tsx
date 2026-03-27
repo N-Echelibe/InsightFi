@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -225,6 +226,7 @@ function calculateProjectedSpending(budget: (typeof budgets)[0]): {
 }
 
 export default function BudgetsPage() {
+  const router = useRouter();
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [selectedBudget, setSelectedBudget] = useState<(typeof budgets)[0] | null>(
     null
@@ -354,10 +356,7 @@ export default function BudgetsPage() {
                       isOverBudget && "border-destructive/50",
                       isWarning && "border-amber-500/30"
                     )}
-                    onClick={() => {
-                      setSelectedBudget(budget);
-                      setBudgetDialogOpen(true);
-                    }}
+                    onClick={() => router.push(`/budgets/${budget.id}`)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between mb-3">
