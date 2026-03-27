@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,16 @@ import {
 } from "recharts";
 import { ArrowLeft, Edit, Trash2, AlertTriangle, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BudgetDialog } from "@/components/budgets/budget-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Mock budget data - in real app would come from database
 const allBudgets = [
@@ -184,8 +195,11 @@ export default function BudgetDetailPage() {
   const router = useRouter();
   const params = useParams();
   const budgetId = parseInt(params.id as string);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [budgets, setBudgets] = useState(allBudgets);
 
-  const budget = allBudgets.find((b) => b.id === budgetId);
+  const budget = budgets.find((b) => b.id === budgetId);
 
   if (!budget) {
     return (
@@ -229,6 +243,11 @@ export default function BudgetDetailPage() {
     totalDays: projectionData.totalDays || 30,
   });
 
+  const handleDeleteBudget = () => {
+    setBudgets(budgets.filter((b) => b.id !== budgetId));
+    router.push("/budgets");
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -250,10 +269,19 @@ export default function BudgetDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon">
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={() => setEditDialogOpen(true)}
+          >
             <Edit className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon" className="text-destructive">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleteDialogOpen(true)}
+          >
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -414,6 +442,29 @@ export default function BudgetDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Budget Dialog */}
+      <BudgetDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        budget={budget}
+      />
+
+      {/* Delete Budget Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Budget</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the &quot;{budget?.category}&quot; budget? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDeleteBudget} className="bg-destructive hover:bg-destructive/90">
+            Delete
+          </AlertDialogAction>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
