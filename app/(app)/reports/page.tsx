@@ -86,6 +86,30 @@ const netWorthHistory = [
   { month: "Dec", assets: 175000, liabilities: 37500, netWorth: 137500 },
 ];
 
+const budgetAdherenceData = [
+  { category: "Food & Dining", budget: 800, spent: 680, adherence: 85 },
+  { category: "Transportation", budget: 400, spent: 320, adherence: 80 },
+  { category: "Shopping", budget: 350, spent: 450, adherence: 0 },
+  { category: "Housing", budget: 2200, spent: 2200, adherence: 100 },
+  { category: "Utilities", budget: 250, spent: 180, adherence: 72 },
+  { category: "Entertainment", budget: 200, spent: 180, adherence: 90 },
+];
+
+const budgetAdherenceTrendData = [
+  { month: "Jan", adherence: 85 },
+  { month: "Feb", adherence: 88 },
+  { month: "Mar", adherence: 82 },
+  { month: "Apr", adherence: 90 },
+  { month: "May", adherence: 87 },
+  { month: "Jun", adherence: 84 },
+  { month: "Jul", adherence: 91 },
+  { month: "Aug", adherence: 86 },
+  { month: "Sep", adherence: 89 },
+  { month: "Oct", adherence: 85 },
+  { month: "Nov", adherence: 88 },
+  { month: "Dec", adherence: 87 },
+];
+
 const reportTypes = [
   {
     id: "spending",
@@ -100,15 +124,15 @@ const reportTypes = [
     icon: TrendingUp,
   },
   {
-    id: "networth",
-    name: "Net Worth Report",
-    description: "Track your assets, liabilities, and net worth over time",
+    id: "budget-performance",
+    name: "Budget Performance Report",
+    description: "Track how well you stay within your budgets",
     icon: BarChart3,
   },
   {
-    id: "tax",
-    name: "Tax Summary",
-    description: "Year-end summary for tax preparation",
+    id: "insights",
+    name: "Insight Report",
+    description: "Key insights and recommendations for better financial health",
     icon: FileText,
   },
 ];
@@ -296,35 +320,26 @@ export default function ReportsPage() {
                 ? "Monthly Income vs Expenses"
                 : reportType === "income"
                   ? "Income Trends"
-                  : reportType === "networth"
-                    ? "Net Worth Over Time"
-                    : "Tax Summary"}
+                  : reportType === "budget-performance"
+                    ? "Budget Adherence Trend"
+                    : "Financial Insights"}
             </CardTitle>
             <Button variant="ghost" size="sm" className="gap-2">
               <Printer className="h-4 w-4" />
               Print
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <div className="h-[350px]">
               <ResponsiveContainer width="100%" height="100%">
-                {reportType === "networth" ? (
-                  <AreaChart data={netWorthHistory}>
-                    <defs>
-                      <linearGradient id="assetsGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="liabilitiesGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
+                {reportType === "budget-performance" ? (
+                  <LineChart data={budgetAdherenceTrendData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis
                       tick={{ fontSize: 12 }}
-                      tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                      domain={[0, 100]}
+                      tickFormatter={(v) => `${v}%`}
                     />
                     <Tooltip
                       contentStyle={{
@@ -332,32 +347,17 @@ export default function ReportsPage() {
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                       }}
-                      formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
-                    />
-                    <Legend />
-                    <Area
-                      type="monotone"
-                      dataKey="assets"
-                      stroke="#22c55e"
-                      fill="url(#assetsGradient)"
-                      name="Assets"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="liabilities"
-                      stroke="#ef4444"
-                      fill="url(#liabilitiesGradient)"
-                      name="Liabilities"
+                      formatter={(value: number) => [`${value}%`, "Adherence"]}
                     />
                     <Line
                       type="monotone"
-                      dataKey="netWorth"
+                      dataKey="adherence"
                       stroke="#3b82f6"
                       strokeWidth={2}
-                      dot={false}
-                      name="Net Worth"
+                      dot={{ fill: "#3b82f6", r: 4 }}
+                      name="Budget Adherence"
                     />
-                  </AreaChart>
+                  </LineChart>
                 ) : (
                   <BarChart data={monthlyData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -381,6 +381,24 @@ export default function ReportsPage() {
                 )}
               </ResponsiveContainer>
             </div>
+
+            {/* Budget Performance Summary */}
+            {reportType === "budget-performance" && (
+              <div className="bg-muted/50 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground">
+                  Budget adherence: <span className="font-semibold text-foreground">87%</span> within last 12 months
+                </p>
+              </div>
+            )}
+
+            {/* Insights Summary */}
+            {reportType === "insights" && (
+              <div className="bg-muted/50 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground">
+                  You stayed within budget in <span className="font-semibold text-foreground">5 out of 6 categories</span>. Housing is on track, while Shopping exceeded its limit.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
