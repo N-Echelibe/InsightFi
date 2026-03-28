@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+
 import {
   Select,
   SelectContent,
@@ -11,18 +12,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
 import {
   Download,
   FileText,
+  Calendar as CalendarIcon,
   TrendingUp,
   TrendingDown,
   DollarSign,
   PieChart as PieChartIcon,
   BarChart3,
+  FileSpreadsheet,
   Printer,
-  AlertCircle,
-  CheckCircle2,
-  AlertTriangle,
 } from "lucide-react";
 import {
   BarChart,
@@ -38,7 +39,10 @@ import {
   LineChart,
   Line,
   Legend,
+  AreaChart,
+  Area,
 } from "recharts";
+
 import { cn } from "@/lib/utils";
 
 const monthlyData = [
@@ -67,54 +71,19 @@ const categoryBreakdown = [
   { name: "Other", value: 300, color: "#6b7280" },
 ];
 
-const budgetAdherenceTrendData = [
-  { month: "Jan", adherence: 85 },
-  { month: "Feb", adherence: 88 },
-  { month: "Mar", adherence: 82 },
-  { month: "Apr", adherence: 90 },
-  { month: "May", adherence: 87 },
-  { month: "Jun", adherence: 84 },
-  { month: "Jul", adherence: 91 },
-  { month: "Aug", adherence: 86 },
-  { month: "Sep", adherence: 89 },
-  { month: "Oct", adherence: 85 },
-  { month: "Nov", adherence: 88 },
-  { month: "Dec", adherence: 87 },
-];
-
-const categoryDominanceData = [
-  { name: "Housing", value: 2200, percentage: 44 },
-  { name: "Food & Dining", value: 680, percentage: 14 },
-  { name: "Shopping", value: 450, percentage: 9 },
-  { name: "Transportation", value: 320, percentage: 6 },
-  { name: "Entertainment", value: 180, percentage: 4 },
-  { name: "Utilities", value: 180, percentage: 4 },
-  { name: "Health", value: 120, percentage: 2 },
-  { name: "Other", value: 270, percentage: 5 },
-];
-
-const spendingTrendData = [
-  { month: "Jan", spending: 4400 },
-  { month: "Feb", spending: 4200 },
-  { month: "Mar", spending: 5100 },
-  { month: "Apr", spending: 4500 },
-  { month: "May", spending: 4800 },
-  { month: "Jun", spending: 5500 },
-  { month: "Jul", spending: 5000 },
-  { month: "Aug", spending: 5300 },
-  { month: "Sep", spending: 4900 },
-  { month: "Oct", spending: 5200 },
-  { month: "Nov", spending: 5700 },
-  { month: "Dec", spending: 6200 },
-];
-
-const budgetRiskAlerts = [
-  { category: "Shopping", risk: "high", percentage: 128, message: "Exceeding by ₦100" },
-  { category: "Food & Dining", risk: "moderate", percentage: 85, message: "On track" },
-  { category: "Transportation", risk: "low", percentage: 80, message: "Well managed" },
-  { category: "Entertainment", risk: "low", percentage: 90, message: "On track" },
-  { category: "Housing", risk: "low", percentage: 100, message: "On target" },
-  { category: "Utilities", risk: "low", percentage: 72, message: "Well managed" },
+const netWorthHistory = [
+  { month: "Jan", assets: 120000, liabilities: 45000, netWorth: 75000 },
+  { month: "Feb", assets: 125000, liabilities: 44000, netWorth: 81000 },
+  { month: "Mar", assets: 128000, liabilities: 43500, netWorth: 84500 },
+  { month: "Apr", assets: 132000, liabilities: 43000, netWorth: 89000 },
+  { month: "May", assets: 138000, liabilities: 42000, netWorth: 96000 },
+  { month: "Jun", assets: 142000, liabilities: 41500, netWorth: 100500 },
+  { month: "Jul", assets: 148000, liabilities: 41000, netWorth: 107000 },
+  { month: "Aug", assets: 152000, liabilities: 40000, netWorth: 112000 },
+  { month: "Sep", assets: 158000, liabilities: 39500, netWorth: 118500 },
+  { month: "Oct", assets: 162000, liabilities: 39000, netWorth: 123000 },
+  { month: "Nov", assets: 168000, liabilities: 38000, netWorth: 130000 },
+  { month: "Dec", assets: 175000, liabilities: 37500, netWorth: 137500 },
 ];
 
 const reportTypes = [
@@ -131,48 +100,178 @@ const reportTypes = [
     icon: TrendingUp,
   },
   {
-    id: "budget-performance",
-    name: "Budget Performance Report",
-    description: "Track how well you stay within your budgets",
+    id: "networth",
+    name: "Net Worth Report",
+    description: "Track your assets, liabilities, and net worth over time",
     icon: BarChart3,
   },
   {
-    id: "insights",
-    name: "Insight Report",
-    description: "Key insights and recommendations for better financial health",
+    id: "tax",
+    name: "Tax Summary",
+    description: "Year-end summary for tax preparation",
     icon: FileText,
   },
 ];
 
 export default function ReportsPage() {
+  const [dateRange, setDateRange] = useState("12m");
   const [reportType, setReportType] = useState("spending");
 
+  const totalIncome = monthlyData.reduce((sum, m) => sum + m.income, 0);
+  const totalExpenses = monthlyData.reduce((sum, m) => sum + m.expenses, 0);
+  const totalSavings = totalIncome - totalExpenses;
+  const savingsRate = Math.round((totalSavings / totalIncome) * 100);
+
+  const handleExport = (format: "pdf" | "csv") => {
+    // In real implementation, generate and download the report
+    console.log(`Exporting report as ${format}`);
+  };
+
   return (
-    <main className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-        <p className="text-muted-foreground mt-2">
-          Analyze your financial performance and get insights
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
+          <p className="text-muted-foreground">
+            Analyze your financial data with detailed reports
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={dateRange} onValueChange={setDateRange}>
+            <SelectTrigger className="w-[140px]">
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1m">Last Month</SelectItem>
+              <SelectItem value="3m">Last 3 Months</SelectItem>
+              <SelectItem value="6m">Last 6 Months</SelectItem>
+              <SelectItem value="12m">Last 12 Months</SelectItem>
+              <SelectItem value="ytd">Year to Date</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" className="gap-2 bg-transparent" onClick={() => handleExport("csv")}>
+            <FileSpreadsheet className="h-4 w-4" />
+            CSV
+          </Button>
+          <Button className="gap-2" onClick={() => handleExport("pdf")}>
+            <Download className="h-4 w-4" />
+            PDF
+          </Button>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Income
+                </p>
+                <p className="text-2xl font-bold">
+                  ${totalIncome.toLocaleString()}
+                </p>
+                <p className="text-xs text-success flex items-center gap-1 mt-1">
+                  <TrendingUp className="h-3 w-3" />
+                  +12% vs last year
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-success/10 text-success">
+                <DollarSign className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Expenses
+                </p>
+                <p className="text-2xl font-bold">
+                  ${totalExpenses.toLocaleString()}
+                </p>
+                <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                  <TrendingUp className="h-3 w-3" />
+                  +8% vs last year
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-destructive/10 text-destructive">
+                <TrendingDown className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Savings
+                </p>
+                <p className="text-2xl font-bold">
+                  ${totalSavings.toLocaleString()}
+                </p>
+                <p className="text-xs text-success flex items-center gap-1 mt-1">
+                  <TrendingUp className="h-3 w-3" />
+                  +18% vs last year
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Savings Rate
+                </p>
+                <p className="text-2xl font-bold">{savingsRate}%</p>
+                <p className="text-xs text-success flex items-center gap-1 mt-1">
+                  <TrendingUp className="h-3 w-3" />
+                  +3% vs last year
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-chart-4/10 text-chart-4">
+                <PieChartIcon className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Report Type Selection */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {reportTypes.map((report) => (
           <Card
             key={report.id}
             className={cn(
               "cursor-pointer transition-all hover:shadow-md",
-              reportType === report.id && "ring-2 ring-primary"
+              reportType === report.id && "border-primary ring-1 ring-primary"
             )}
             onClick={() => setReportType(report.id)}
           >
-            <CardContent className="p-5">
-              <div className="flex flex-col gap-3">
-                <div className={cn("p-2 rounded-lg w-fit", 
-                  reportType === report.id ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                )}>
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div
+                  className={cn(
+                    "p-2 rounded-lg",
+                    reportType === report.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  )}
+                >
                   <report.icon className="h-5 w-5" />
                 </div>
                 <div>
@@ -187,382 +286,226 @@ export default function ReportsPage() {
         ))}
       </div>
 
-      {/* Reports Content */}
-      <div className="space-y-6">
-        {/* Budget Performance Report */}
-        {reportType === "budget-performance" && (
-          <div className="space-y-6">
-            {/* Main Chart */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle>Budget Adherence Trend</CardTitle>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Printer className="h-4 w-4" />
-                  Print
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="h-[350px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={budgetAdherenceTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis 
-                        dataKey="month" 
-                        tick={{ fontSize: 12 }}
-                        tickLine={false}
-                        axisLine={false}
-                        className="text-muted-foreground"
-                      />
-                      <YAxis
-                        tick={{ fontSize: 12 }}
-                        domain={[0, 100]}
-                        tickFormatter={(v) => `${v}%`}
-                        tickLine={false}
-                        axisLine={false}
-                        className="text-muted-foreground"
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                          fontSize: "12px",
-                        }}
-                        formatter={(value: number) => [`${value}%`, "Adherence"]}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="adherence"
-                        stroke="#3b82f6"
-                        strokeWidth={3}
-                        dot={{ fill: "#3b82f6", r: 5 }}
-                        activeDot={{ r: 7 }}
-                        name="Budget Adherence"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-lg font-semibold">
+              {reportType === "spending"
+                ? "Monthly Income vs Expenses"
+                : reportType === "income"
+                  ? "Income Trends"
+                  : reportType === "networth"
+                    ? "Net Worth Over Time"
+                    : "Tax Summary"}
+            </CardTitle>
+            <Button variant="ghost" size="sm" className="gap-2">
+              <Printer className="h-4 w-4" />
+              Print
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[350px]">
+              <ResponsiveContainer width="100%" height="100%">
+                {reportType === "networth" ? (
+                  <AreaChart data={netWorthHistory}>
+                    <defs>
+                      <linearGradient id="assetsGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="liabilitiesGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
+                    />
+                    <Legend />
+                    <Area
+                      type="monotone"
+                      dataKey="assets"
+                      stroke="#22c55e"
+                      fill="url(#assetsGradient)"
+                      name="Assets"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="liabilities"
+                      stroke="#ef4444"
+                      fill="url(#liabilitiesGradient)"
+                      name="Liabilities"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="netWorth"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      dot={false}
+                      name="Net Worth"
+                    />
+                  </AreaChart>
+                ) : (
+                  <BarChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
+                    />
+                    <Legend />
+                    <Bar dataKey="income" fill="#22c55e" radius={[4, 4, 0, 0]} name="Income" />
+                    <Bar dataKey="expenses" fill="#ef4444" radius={[4, 4, 0, 0]} name="Expenses" />
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
 
-                {/* Budget Performance Summary */}
-                <div className="bg-muted/50 rounded-lg p-4 flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Budget adherence: 87%</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      You stayed within budget in 5 out of 6 categories within the last 12 months
-                    </p>
+        {/* Category Breakdown */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold">
+              Expense Breakdown
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categoryBreakdown}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {categoryBreakdown.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value: number) => [`$${value}`, ""]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="space-y-2 mt-4">
+              {categoryBreakdown.map((item) => (
+                <div key={item.name} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="text-sm">{item.name}</span>
                   </div>
+                  <span className="text-sm font-medium">${item.value}</span>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-        {/* Insight Report */}
-        {reportType === "insights" && (
-          <div className="space-y-6">
-            {/* Category Dominance */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle>Category Dominance</CardTitle>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Printer className="h-4 w-4" />
-                  Print
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={categoryDominanceData}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} angle={-45} textAnchor="end" height={80} />
-                      <YAxis
-                        tick={{ fontSize: 12 }}
-                        tickFormatter={(v) => `${v}%`}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                          fontSize: "12px",
-                        }}
-                        formatter={(value: number) => `${value}%`}
-                      />
-                      <Bar dataKey="percentage" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div className="bg-muted/50 rounded-lg p-4">
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-semibold text-foreground">Housing</span> dominates your spending at 44% of total expenses, followed by Food & Dining at 14%.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Spending Trends */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Spending Trends</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={spendingTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis 
-                        dataKey="month" 
-                        tick={{ fontSize: 12 }}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 12 }}
-                        tickFormatter={(v) => `₦${(v / 1000).toFixed(0)}k`}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                          fontSize: "12px",
-                        }}
-                        formatter={(value: number) => `₦${value.toLocaleString()}`}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="spending"
-                        stroke="#f97316"
-                        strokeWidth={3}
-                        dot={{ fill: "#f97316", r: 5 }}
-                        activeDot={{ r: 7 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div className="bg-muted/50 rounded-lg p-4">
-                  <p className="text-sm text-muted-foreground">
-                    Your spending shows an <span className="font-semibold text-foreground">upward trend</span>, increasing from ₦4,400 in January to ₦6,200 in December, a 41% increase.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Budget Risk Alerts */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Budget Risk Alerts</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {budgetRiskAlerts.map((alert) => (
-                    <div key={alert.category} className="flex items-start justify-between p-3 bg-muted/30 rounded-lg">
-                      <div className="flex items-start gap-3 flex-1">
-                        {alert.risk === "high" ? (
-                          <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-                        ) : alert.risk === "moderate" ? (
-                          <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                        ) : (
-                          <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
-                        )}
-                        <div>
-                          <p className="text-sm font-medium">{alert.category}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{alert.message}</p>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="text-sm font-semibold">{alert.percentage}%</span>
-                        <Badge 
+      {/* Detailed Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold">
+            Monthly Breakdown
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                    Month
+                  </th>
+                  <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">
+                    Income
+                  </th>
+                  <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">
+                    Expenses
+                  </th>
+                  <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">
+                    Savings
+                  </th>
+                  <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">
+                    Savings Rate
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyData.map((month) => {
+                  const rate = Math.round((month.savings / month.income) * 100);
+                  return (
+                    <tr
+                      key={month.month}
+                      className="border-b last:border-0 hover:bg-muted/50 transition-colors"
+                    >
+                      <td className="py-3 px-4 font-medium">{month.month} 2024</td>
+                      <td className="py-3 px-4 text-right text-success">
+                        +${month.income.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-right text-destructive">
+                        -${month.expenses.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium">
+                        ${month.savings.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <Badge
                           variant="secondary"
                           className={cn(
-                            "text-xs",
-                            alert.risk === "high" && "bg-destructive/10 text-destructive",
-                            alert.risk === "moderate" && "bg-amber-500/10 text-amber-700",
-                            alert.risk === "low" && "bg-success/10 text-success"
+                            rate >= 30
+                              ? "bg-success/10 text-success"
+                              : rate >= 20
+                                ? "bg-warning/10 text-warning"
+                                : "bg-destructive/10 text-destructive"
                           )}
                         >
-                          {alert.risk === "high" ? "High Risk" : alert.risk === "moderate" ? "Moderate" : "Low Risk"}
+                          {rate}%
                         </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Spending Behavior & Risk Level */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Spending Behavior Classification */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Spending Behavior Classification</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="p-4 bg-muted/50 rounded-lg border border-muted">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium text-sm">Pattern</p>
-                          <p className="text-xs text-muted-foreground mt-1">Steady with seasonal spikes</p>
-                        </div>
-                        <Badge variant="secondary">Identified</Badge>
-                      </div>
-                    </div>
-                    <div className="p-4 bg-muted/50 rounded-lg border border-muted">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium text-sm">Frequency</p>
-                          <p className="text-xs text-muted-foreground mt-1">Regular monthly with variation</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-4 bg-muted/50 rounded-lg border border-muted">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium text-sm">Average Spend</p>
-                          <p className="text-lg font-bold mt-1">₦5,075</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Risk Level Summary */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Overall Risk Level</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-amber-500/10 rounded-lg border border-amber-500/30">
-                    <div>
-                      <p className="font-semibold text-amber-900">Moderate Risk</p>
-                      <p className="text-xs text-amber-700 mt-1">1 category exceeds budget</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-amber-700">83%</p>
-                      <p className="text-xs text-amber-700">Overall Health</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Risk Categories</span>
-                      <span className="font-medium">1 High, 1 Moderate, 4 Low</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Recommendations</span>
-                      <span className="font-medium">Focus on Shopping budget</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
-
-        {/* Standard Reports (Spending & Income) */}
-        {(reportType === "spending" || reportType === "income") && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main Chart */}
-            <Card className="lg:col-span-2">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg font-semibold">
-                  {reportType === "spending"
-                    ? "Monthly Income vs Expenses"
-                    : "Income Trends"}
-                </CardTitle>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Printer className="h-4 w-4" />
-                  Print
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[350px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyData}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                      <YAxis
-                        tick={{ fontSize: 12 }}
-                        tickFormatter={(v) => `₦${(v / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                        formatter={(value: number) => `₦${value.toLocaleString()}`}
-                      />
-                      <Legend />
-                      <Bar dataKey="income" fill="#22c55e" radius={[4, 4, 0, 0]} name="Income" />
-                      <Bar dataKey="expenses" fill="#ef4444" radius={[4, 4, 0, 0]} name="Expenses" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Category Breakdown */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">
-                  Expense Breakdown
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[200px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categoryBreakdown}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {categoryBreakdown.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                        formatter={(value: number) => `₦${value.toLocaleString()}`}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="space-y-2 mt-4 max-h-[200px] overflow-y-auto">
-                  {categoryBreakdown.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span className="text-muted-foreground">{item.name}</span>
-                      </div>
-                      <span className="font-medium">₦{item.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </div>
-    </main>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
