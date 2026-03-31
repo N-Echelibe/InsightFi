@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,18 +34,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { format } from "date-fns";
+import * as LucideIcons from "lucide-react";
 import {
   Plus,
   Search,
   Filter,
   Download,
   MoreHorizontal,
-  Coffee,
-  ShoppingBag,
-  Car,
-  Wifi,
-  Home,
-  ArrowDownLeft,
   Edit,
   Trash2,
   Tag,
@@ -53,99 +48,28 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddTransactionDialog } from "@/components/transactions/add-transaction-dialog";
-import { useSearchParams } from "next/navigation";
 import Loading from "./loading";
+import axios from "axios";
+import api from "@/lib/api";
 
-const transactions = [
-  {
-    id: 1,
-    name: "Starbucks Coffee",
-    category: "Food & Dining",
-    account: "Chase Checking",
-    amount: -5.75,
-    date: "2024-01-21",
-    status: "completed",
-    icon: Coffee,
-    color: "bg-amber-500/10 text-amber-500",
-  },
-  {
-    id: 2,
-    name: "Salary Deposit",
-    category: "Income",
-    account: "Chase Checking",
-    amount: 4500.0,
-    date: "2024-01-20",
-    status: "completed",
-    icon: ArrowDownLeft,
-    color: "bg-success/10 text-success",
-  },
-  {
-    id: 3,
-    name: "Amazon Purchase",
-    category: "Shopping",
-    account: "Amex Platinum",
-    amount: -89.99,
-    date: "2024-01-18",
-    status: "completed",
-    icon: ShoppingBag,
-    color: "bg-orange-500/10 text-orange-500",
-  },
-  {
-    id: 4,
-    name: "Uber Ride",
-    category: "Transportation",
-    account: "Chase Checking",
-    amount: -24.5,
-    date: "2024-01-17",
-    status: "completed",
-    icon: Car,
-    color: "bg-blue-500/10 text-blue-500",
-  },
-  {
-    id: 5,
-    name: "Netflix Subscription",
-    category: "Subscriptions",
-    account: "Amex Platinum",
-    amount: -15.99,
-    date: "2024-01-16",
-    status: "completed",
-    icon: Wifi,
-    color: "bg-red-500/10 text-red-500",
-  },
-  {
-    id: 6,
-    name: "Rent Payment",
-    category: "Housing",
-    account: "Chase Checking",
-    amount: -2200.0,
-    date: "2024-01-15",
-    status: "completed",
-    icon: Home,
-    color: "bg-emerald-500/10 text-emerald-500",
-  },
-  {
-    id: 7,
-    name: "Grocery Store",
-    category: "Food & Dining",
-    account: "Chase Checking",
-    amount: -156.32,
-    date: "2024-01-14",
-    status: "pending",
-    icon: ShoppingBag,
-    color: "bg-amber-500/10 text-amber-500",
-  },
-  {
-    id: 8,
-    name: "Gas Station",
-    category: "Transportation",
-    account: "Chase Checking",
-    amount: -45.0,
-    date: "2024-01-13",
-    status: "completed",
-    icon: Car,
-    color: "bg-blue-500/10 text-blue-500",
-  },
-];
+type Transaction = {
+  id: string;
+  description: string;
+  amount: number;
+  type: "income" | "expense" | string;
+  category_id?: string;
+  date: string;
+  created_at?: string;
+  status: string;
+  categories?: {
+    icon?: string;
+    name?: string;
+    color?: string;
+  };
+  accounts?: {
+    name?: string;
+  };
+};
 
 export default function TransactionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -155,68 +79,135 @@ export default function TransactionsPage() {
   const [customDateEnd, setCustomDateEnd] = useState<Date | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const searchParams = useSearchParams();
-  const itemsPerPage = 10;
+  const [transactionsData, setTransactionsData] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const itemsPerPage = 8;
 
-  // Helper function to check if transaction is within date range
-  const isWithinDateRange = (transactionDate: string): boolean => {
-    const txDate = new Date(transactionDate);
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    thirtyDaysAgo.setHours(0, 0, 0, 0);
-
-    const ninetyDaysAgo = new Date(today);
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    ninetyDaysAgo.setHours(0, 0, 0, 0);
-
-    const sixMonthsAgo = new Date(today);
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    sixMonthsAgo.setHours(0, 0, 0, 0);
-
-    if (dateFilter === "custom" && customDateStart && customDateEnd) {
-      const startDate = new Date(customDateStart);
-      const endDate = new Date(customDateEnd);
-      endDate.setHours(23, 59, 59, 999);
-      return txDate >= startDate && txDate <= endDate;
+  const resolveIcon = (iconName?: string) => {
+    if (!iconName) {
+      return LucideIcons.Tag;
     }
 
-    switch (dateFilter) {
-      case "7d":
-        const sevenDaysAgo = new Date(today);
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        return txDate >= sevenDaysAgo && txDate <= today;
-      case "30d":
-        return txDate >= thirtyDaysAgo && txDate <= today;
-      case "90d":
-        return txDate >= ninetyDaysAgo && txDate <= today;
-      case "6m":
-        return txDate >= sixMonthsAgo && txDate <= today;
-      default:
-        return true;
+    const normalized = iconName
+      .trim()
+      .replace(/[-_ ]+/g, " ")
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join("");
+
+    // direct oj; if not found fallback to Tag
+    return (LucideIcons as any)[normalized] || LucideIcons.Tag;
+  };
+
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 15,
+    total: 0,
+    pages: 1,
+  });
+
+  const fetchTransactions = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams();
+      params.set("page", `${currentPage}`);
+
+      if (categoryFilter !== "all") {
+        params.set("category", categoryFilter);
+      }
+
+      if (searchQuery.trim()) {
+        params.set("search", searchQuery.trim());
+      }
+
+      const now = new Date();
+      let startDate: Date | null = null;
+      let endDate: Date | null = null;
+
+      if (dateFilter === "7d") {
+        startDate = new Date(now);
+        startDate.setDate(startDate.getDate() - 7);
+      } else if (dateFilter === "30d") {
+        startDate = new Date(now);
+        startDate.setDate(startDate.getDate() - 30);
+      } else if (dateFilter === "90d") {
+        startDate = new Date(now);
+        startDate.setDate(startDate.getDate() - 90);
+      } else if (dateFilter === "6m") {
+        startDate = new Date(now);
+        startDate.setMonth(startDate.getMonth() - 6);
+      } else if (dateFilter === "custom" && customDateStart && customDateEnd) {
+        startDate = customDateStart;
+        endDate = customDateEnd;
+      }
+
+      if (startDate) {
+        params.set("startDate", startDate.toISOString());
+      }
+      if (endDate) {
+        const endDateCopy = new Date(endDate);
+        endDateCopy.setHours(23, 59, 59, 999);
+        params.set("endDate", endDateCopy.toISOString());
+      }
+
+      const response = await axios.get(`${api.baseURL}/transactions?${params.toString()}`);
+      const payload = response.data;
+
+      if (payload && Array.isArray(payload.transactions)) {
+        setTransactionsData(payload.transactions);
+        setPagination({
+          page: payload.pagination?.page ?? 1,
+          limit: payload.pagination?.limit ?? 8,
+          total: payload.pagination?.total ?? payload.transactions.length,
+          pages: payload.pagination?.pages ?? 1,
+        });
+        setCurrentPage(payload.pagination?.page ?? 1);
+      } else {
+        setTransactionsData([]);
+        setPagination({ page: 1, limit: itemsPerPage, total: 0, pages: 1 });
+        setError("Unexpected transactions payload");
+      }
+    } catch (err) {
+      console.error("Failed to fetch transactions", err);
+      setTransactionsData([]);
+      setPagination({ page: 1, limit: itemsPerPage, total: 0, pages: 1 });
+      setError("Failed to load transactions");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const filteredTransactions = transactions.filter((t) => {
-    const matchesSearch = t.name
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      categoryFilter === "all" || t.category === categoryFilter;
-    const matchesDate = isWithinDateRange(t.date);
-    return matchesSearch && matchesCategory && matchesDate;
-  });
+  useEffect(() => {
+    fetchTransactions();
+  }, [searchQuery, categoryFilter, dateFilter, customDateStart, customDateEnd, currentPage]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
-  const startIdx = (currentPage - 1) * itemsPerPage;
-  const paginatedTransactions = filteredTransactions.slice(startIdx, startIdx + itemsPerPage);
+  const filteredTransactions = transactionsData;
+  const paginatedTransactions = filteredTransactions;
+  const totalPages = pagination.pages;
+  const startIdx = (pagination.page - 1) * pagination.limit;
 
   const handlePageChange = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Loading />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6 text-destructive">
+        <p>{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -371,56 +362,61 @@ export default function TransactionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedTransactions.map((transaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className={cn("p-2 rounded-lg", transaction.color)}>
-                          <transaction.icon className="h-4 w-4" />
+                {paginatedTransactions.map((transaction) => {
+                  const Icon = resolveIcon(transaction.categories?.icon);
+                  const effectiveAmount =
+                    transaction.type === "expense"
+                      ? -Math.abs(transaction.amount)
+                      : Math.abs(transaction.amount);
+
+                  return (
+                    <TableRow key={transaction.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className={cn("p-2 rounded-lg", transaction.categories?.color)}>
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <span className="font-medium">{transaction.description}</span>
                         </div>
-                        <span className="font-medium">{transaction.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="font-normal">
-                        {transaction.category}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {transaction.account}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(transaction.date).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          transaction.status === "completed"
-                            ? "default"
-                            : "secondary"
-                        }
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="font-normal">
+                          {transaction.categories?.name || "Unknown"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {transaction.accounts?.name || "Unknown"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(transaction.date).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            transaction.status === "completed" ? "default" : "secondary"
+                          }
+                          className={cn(
+                            "capitalize",
+                            transaction.status === "completed" &&
+                              "bg-success/10 text-success hover:bg-success/20"
+                          )}
+                        >
+                          {transaction.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell
                         className={cn(
-                          "capitalize",
-                          transaction.status === "completed" &&
-                            "bg-success/10 text-success hover:bg-success/20"
+                          "text-right font-semibold",
+                          effectiveAmount > 0 ? "text-success" : ""
                         )}
                       >
-                        {transaction.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right font-semibold",
-                        transaction.amount > 0 ? "text-success" : ""
-                      )}
-                    >
-                      {transaction.amount > 0 ? "+" : ""}₦
-                      {Math.abs(transaction.amount).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </TableCell>
+                        {effectiveAmount > 0 ? "+" : ""}₦
+                        {Math.abs(effectiveAmount).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -445,7 +441,8 @@ export default function TransactionsPage() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))}
+                );
+              })}
               </TableBody>
             </Table>
           </div>
@@ -454,7 +451,7 @@ export default function TransactionsPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-6 pt-4 border-t">
               <p className="text-sm text-muted-foreground">
-                Showing {startIdx + 1} to {Math.min(startIdx + itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length}
+                Showing {Math.min(startIdx + 1, pagination.total)} to {Math.min(startIdx + pagination.limit, pagination.total)} of {pagination.total}
               </p>
               <div className="flex items-center gap-2">
                 <Button
