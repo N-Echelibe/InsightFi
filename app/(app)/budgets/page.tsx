@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,8 @@ import {
 import { cn } from "@/lib/utils";
 import { BudgetDialog } from "@/components/budgets/budget-dialog";
 import { SavingsBuckets } from "@/components/budgets/savings-buckets";
+import { CardSkeleton } from "@/components/skeletons";
+import { ErrorState, EmptyState } from "@/components/states";
 import {
   PieChart,
   Pie,
@@ -231,10 +233,80 @@ export default function BudgetsPage() {
   const [selectedBudget, setSelectedBudget] = useState<(typeof budgets)[0] | null>(
     null
   );
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const totalBudget = budgets.reduce((sum, b) => sum + b.budget, 0);
   const totalSpent = budgets.reduce((sum, b) => sum + b.spent, 0);
   const overBudgetItems = budgets.filter((b) => b.spent > b.budget);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <div className="h-8 w-1/4 rounded-md bg-muted" />
+          <div className="mt-2 h-4 w-1/3 rounded-md bg-muted" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <CardSkeleton count={4} variant="stat" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <CardSkeleton count={2} variant="content" className="lg:col-span-2" />
+        </div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Budgets</h1>
+          <p className="text-muted-foreground">
+            Manage your spending limits and track progress
+          </p>
+        </div>
+        <ErrorState
+          title="Failed to load budgets"
+          description="We couldn&apos;t load your budgets. Please try again."
+          onRetry={() => {
+            setHasError(false);
+            setIsLoading(true);
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (budgets.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Budgets</h1>
+          <p className="text-muted-foreground">
+            Manage your spending limits and track progress
+          </p>
+        </div>
+        <EmptyState
+          icon={Target}
+          title="No budgets yet"
+          description="Create your first budget to start tracking your spending and achieving your financial goals."
+          action={{
+            label: "Create Budget",
+            onClick: () => setBudgetDialogOpen(true),
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

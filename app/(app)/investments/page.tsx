@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChartSkeleton, CardSkeleton } from "@/components/skeletons";
+import { ErrorState, EmptyState } from "@/components/states";
 import {
   Select,
   SelectContent,
@@ -136,10 +138,59 @@ const allocation = [
 
 export default function InvestmentsPage() {
   const [timeRange, setTimeRange] = useState("1y");
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const totalValue = holdings.reduce((sum, h) => sum + h.value, 0);
   const totalChange = holdings.reduce((sum, h) => sum + h.change * h.shares, 0);
   const totalChangePercent = (totalChange / (totalValue - totalChange)) * 100;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <div className="h-8 w-1/4 rounded-md bg-muted" />
+          <div className="mt-2 h-4 w-1/3 rounded-md bg-muted" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <CardSkeleton count={4} variant="stat" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ChartSkeleton />
+          <ChartSkeleton />
+        </div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Investments</h1>
+          <p className="text-muted-foreground">
+            Track your portfolio performance and holdings
+          </p>
+        </div>
+        <ErrorState
+          title="Failed to load investments"
+          description="We couldn&apos;t load your investment portfolio. Please try again."
+          onRetry={() => {
+            setHasError(false);
+            setIsLoading(true);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

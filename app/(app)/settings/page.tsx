@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
+import { CardSkeleton } from "@/components/skeletons";
+import { ErrorState } from "@/components/states";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +42,17 @@ import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   const [notifications, setNotifications] = useState({
     budgetAlerts: true,
     savingsGoals: true,
@@ -91,6 +104,41 @@ export default function SettingsPage() {
   const deleteCategory = (category: string) => {
     setCategories(categories.filter((c) => c !== category));
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <div className="h-8 w-1/4 rounded-md bg-muted" />
+          <div className="mt-2 h-4 w-1/3 rounded-md bg-muted" />
+        </div>
+        <div className="space-y-4">
+          <CardSkeleton count={3} variant="content" />
+        </div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+          <p className="text-muted-foreground">
+            Manage your account and application preferences
+          </p>
+        </div>
+        <ErrorState
+          title="Failed to load settings"
+          description="We couldn&apos;t load your settings. Please try again."
+          onRetry={() => {
+            setHasError(false);
+            setIsLoading(true);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

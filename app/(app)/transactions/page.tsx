@@ -51,6 +51,8 @@ import { AddTransactionDialog } from "@/components/transactions/add-transaction-
 import Loading from "./loading";
 import axios from "axios";
 import api from "@/lib/api";
+import { TableSkeleton } from "@/components/skeletons";
+import { ErrorState, EmptyState } from "@/components/states";
 
 type Transaction = {
   id: string;
@@ -203,8 +205,18 @@ export default function TransactionsPage() {
 
   if (error) {
     return (
-      <div className="space-y-6 text-destructive">
-        <p>{error}</p>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
+          <p className="text-muted-foreground">
+            Manage and track all your transactions
+          </p>
+        </div>
+        <ErrorState
+          title="Failed to load transactions"
+          description={error}
+          onRetry={() => fetchTransactions()}
+        />
       </div>
     );
   }
@@ -362,7 +374,36 @@ export default function TransactionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedTransactions.map((transaction) => {
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-12">
+                      <div className="space-y-3">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <div key={i} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg animate-pulse">
+                            <div className="h-8 w-8 rounded bg-muted" />
+                            <div className="h-4 flex-1 bg-muted rounded" />
+                            <div className="h-4 w-20 bg-muted rounded" />
+                          </div>
+                        ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : paginatedTransactions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7}>
+                      <EmptyState
+                        title="No transactions yet"
+                        description="Start tracking your finances by adding your first transaction."
+                        action={{
+                          label: "Add Transaction",
+                          onClick: () => setAddDialogOpen(true),
+                        }}
+                        variant="inline"
+                      />
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedTransactions.map((transaction) => {
                   const Icon = resolveIcon(transaction.categories?.icon);
                   const effectiveAmount =
                     transaction.type === "expense"
@@ -442,7 +483,8 @@ export default function TransactionsPage() {
                     </TableCell>
                   </TableRow>
                 );
-              })}
+              })
+                )}
               </TableBody>
             </Table>
           </div>

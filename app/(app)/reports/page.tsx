@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ChartSkeleton, CardSkeleton } from "@/components/skeletons";
+import { ErrorState } from "@/components/states";
 
 import {
   Select,
@@ -116,6 +118,16 @@ const reportTypes = [
 export default function ReportsPage() {
   const [dateRange, setDateRange] = useState("12m");
   const [reportType, setReportType] = useState("spending");
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const totalIncome = monthlyData.reduce((sum, m) => sum + m.income, 0);
   const totalExpenses = monthlyData.reduce((sum, m) => sum + m.expenses, 0);
@@ -126,6 +138,46 @@ export default function ReportsPage() {
     // In real implementation, generate and download the report
     console.log(`Exporting report as ${format}`);
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <div className="h-8 w-1/4 rounded-md bg-muted" />
+          <div className="mt-2 h-4 w-1/3 rounded-md bg-muted" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <ChartSkeleton />
+          </div>
+          <div className="space-y-4">
+            <CardSkeleton count={2} variant="content" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
+          <p className="text-muted-foreground">
+            Analyze your financial data with detailed reports
+          </p>
+        </div>
+        <ErrorState
+          title="Failed to load reports"
+          description="We couldn&apos;t load your reports. Please try again."
+          onRetry={() => {
+            setHasError(false);
+            setIsLoading(true);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

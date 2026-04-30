@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { AccountsCard } from "@/components/dashboard/accounts-card";
 import { SpendingChart } from "@/components/dashboard/spending-chart";
@@ -20,8 +21,39 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CardSkeleton, PageSkeleton } from "@/components/skeletons";
+import { ErrorState } from "@/components/states";
 
 export default function DashboardPage() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    // Simulate data loading
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return <PageSkeleton statsCount={4} sections={[{ type: "chart" }]} />;
+  }
+
+  if (hasError) {
+    return (
+      <ErrorState
+        title="Failed to load dashboard"
+        description="We couldn't load your financial overview. Please try again."
+        onRetry={() => {
+          setHasError(false);
+          setIsLoading(true);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
