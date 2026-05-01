@@ -164,7 +164,7 @@ export function SavingsBuckets() {
       </div>
 
       {/* Actions */}
-        <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="flex gap-2">
         <Button className="gap-2" onClick={() => setDialogOpen(true)}>
           <Plus className="h-4 w-4" />
           New Bucket
@@ -270,7 +270,7 @@ export function SavingsBuckets() {
 
       {/* Create Bucket Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Savings Bucket</DialogTitle>
             <DialogDescription>
@@ -305,7 +305,7 @@ export function SavingsBuckets() {
               <Switch />
             </div>
           </div>
-          <DialogFooter className="sm:[&>button]:w-auto [&>button]:w-full">
+          <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
@@ -316,7 +316,7 @@ export function SavingsBuckets() {
 
       {/* Transfer Dialog */}
       <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Transfer Between Buckets</DialogTitle>
             <DialogDescription>
@@ -356,7 +356,7 @@ export function SavingsBuckets() {
               </div>
             </div>
           </div>
-          <DialogFooter className="sm:[&>button]:w-auto [&>button]:w-full">
+          <DialogFooter>
             <Button
               variant="outline"
               onClick={() => setTransferDialogOpen(false)}

@@ -66,22 +66,20 @@ export function AccountsCard() {
           {accounts.map((account) => (
             <div
               key={account.name}
-              className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+              className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
             >
-              <div className="flex min-w-0 items-center gap-3">
-                <div className={cn("shrink-0 p-2 rounded-lg", account.color)}>
+              <div className="flex items-center gap-3">
+                <div className={cn("p-2 rounded-lg", account.color)}>
                   <account.icon className="h-4 w-4" />
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{account.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {account.bank}
-                  </p>
+                <div>
+                  <p className="text-sm font-medium">{account.name}</p>
+                  <p className="text-xs text-muted-foreground">{account.bank}</p>
                 </div>
               </div>
               <p
                 className={cn(
-                  "shrink-0 text-sm font-semibold",
+                  "text-sm font-semibold",
                   account.balance < 0 && "text-destructive"
                 )}
               >

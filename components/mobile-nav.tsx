@@ -7,8 +7,9 @@ import {
   LayoutDashboard,
   ArrowLeftRight,
   PiggyBank,
-  Lightbulb,
+  TrendingUp,
   FileBarChart,
+  MessageSquareText,
   Settings,
   Wallet,
 } from "lucide-react";
@@ -30,14 +31,19 @@ const navItems = [
     icon: PiggyBank,
   },
   {
-    title: "Insights",
-    href: "/insights",
-    icon: Lightbulb,
+    title: "Investments",
+    href: "/investments",
+    icon: TrendingUp,
   },
   {
     title: "Reports",
     href: "/reports",
     icon: FileBarChart,
+  },
+  {
+    title: "AI Assistant",
+    href: "/ai-assistant",
+    icon: MessageSquareText,
   },
   {
     title: "Settings",
