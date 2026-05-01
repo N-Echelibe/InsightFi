@@ -33,11 +33,24 @@ import { cn } from "@/lib/utils";
 interface AddTransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  accounts: Array<{ id: string; name: string }>;
+  categories: Array<{ id: string; name: string; type?: string }>;
+  onSubmit: (transaction: {
+    account_id: string;
+    amount: number;
+    type: "expense" | "income";
+    category_id: string;
+    description: string;
+    date: string;
+  }) => Promise<void>;
 }
 
 export function AddTransactionDialog({
   open,
   onOpenChange,
+  accounts,
+  categories,
+  onSubmit,
 }: AddTransactionDialogProps) {
   const [type, setType] = useState<"expense" | "income">("expense");
   const [date, setDate] = useState<Date>(new Date());
@@ -46,14 +59,31 @@ export function AddTransactionDialog({
   const [category, setCategory] = useState("");
   const [account, setAccount] = useState("");
 
-  const handleSubmit = () => {
-    // In real implementation, save the transaction
-    onOpenChange(false);
-    // Reset form
-    setAmount("");
-    setName("");
-    setCategory("");
-    setAccount("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!amount || !name.trim() || !category || !account) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await onSubmit({
+        account_id: account,
+        amount: Number(amount),
+        type,
+        category_id: category,
+        description: name.trim(),
+        date: date.toISOString(),
+      });
+      onOpenChange(false);
+      setAmount("");
+      setName("");
+      setCategory("");
+      setAccount("");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -114,26 +144,13 @@ export function AddTransactionDialog({
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                {type === "expense" ? (
-                  <>
-                    <SelectItem value="food">Food & Dining</SelectItem>
-                    <SelectItem value="transportation">Transportation</SelectItem>
-                    <SelectItem value="shopping">Shopping</SelectItem>
-                    <SelectItem value="housing">Housing</SelectItem>
-                    <SelectItem value="utilities">Utilities</SelectItem>
-                    <SelectItem value="entertainment">Entertainment</SelectItem>
-                    <SelectItem value="health">Health</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </>
-                ) : (
-                  <>
-                    <SelectItem value="salary">Salary</SelectItem>
-                    <SelectItem value="freelance">Freelance</SelectItem>
-                    <SelectItem value="investment">Investment</SelectItem>
-                    <SelectItem value="refund">Refund</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </>
-                )}
+                {categories
+                  .filter((item) => !item.type || item.type === type)
+                  .map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -145,9 +162,11 @@ export function AddTransactionDialog({
                 <SelectValue placeholder="Select account" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="chase">Chase Checking</SelectItem>
-                <SelectItem value="ally">Ally Savings</SelectItem>
-                <SelectItem value="amex">Amex Platinum</SelectItem>
+                {accounts.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -183,7 +202,9 @@ export function AddTransactionDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit}>Add Transaction</Button>
+          <Button onClick={handleSubmit} disabled={isSaving}>
+            {isSaving ? "Adding..." : "Add Transaction"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

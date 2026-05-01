@@ -30,12 +30,14 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import api from "@/lib/api";
 
-type BudgetPeriod = "weekly" | "monthly" | "yearly" | "onetime" | "custom";
+type BudgetPeriod = "daily" | "weekly" | "monthly" | "yearly" | "onetime" | "custom";
 type BudgetStatus = "safe" | "warning" | "over";
 
 type BudgetDetail = {
-  id: number;
+  id: string | number;
+  category_id?: string;
   category: string;
   name: string;
   spent: number;
@@ -219,6 +221,7 @@ const relatedTransactions: RelatedTransaction[] = [
 ];
 
 const periodLabels: Record<BudgetPeriod, string> = {
+  daily: "Daily budget",
   weekly: "Weekly budget",
   monthly: "Monthly budget",
   yearly: "Yearly budget",
@@ -292,6 +295,7 @@ function getPeriodLength(budget: BudgetDetail) {
     );
   }
 
+  if (budget.type === "daily") return 1;
   if (budget.type === "weekly") return 7;
   if (budget.type === "yearly") return 365;
   return 30;
@@ -410,14 +414,64 @@ export default function BudgetDetailPage() {
   const params = useParams();
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [budget, setBudget] = useState<BudgetDetail | null>(null);
+  const [transactions, setTransactions] = useState<RelatedTransaction[]>([]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
-  }, []);
+    const loadBudget = async () => {
+      try {
+        setHasError(false);
+        setIsLoading(true);
 
-  const budgetId = Number(params.id);
-  const budget = budgets.find((item) => item.id === budgetId);
+        const budgetId = String(params.id);
+        const [budgetResponse, transactionsResponse] = await Promise.all([
+          api.get<{ budget: any }>(`/budgets/${budgetId}`),
+          api.get<{ transactions: any[] }>(`/budgets/${budgetId}/transactions`),
+        ]);
+
+        const iconMap: Record<string, LucideIcon> = {
+          utensils: Utensils,
+          bus: Bus,
+          home: Home,
+          wifi: Wifi,
+          book: BookOpen,
+          target: Target,
+        };
+        const item = budgetResponse.budget;
+
+        setBudget({
+          id: item.id,
+          category_id: item.category_id?.id ?? item.category_id,
+          category: item.categories?.name ?? item.category_id?.name ?? "Budget",
+          name: item.categories?.name ?? item.category_id?.name ?? "Budget",
+          spent: Number(item.spent ?? item.expense ?? 0),
+          budget: Number(item.budget ?? item.amount ?? 0),
+          type: item.period ?? item.type ?? "monthly",
+          icon: iconMap[item.categories?.icon ?? item.category_id?.icon] ?? Target,
+          startDate: item.start_date ? new Date(item.start_date) : undefined,
+          endDate: item.end_date ? new Date(item.end_date) : undefined,
+          createdDate: item.created_at ? new Date(item.created_at) : undefined,
+        });
+        setTransactions(
+          transactionsResponse.transactions.map((transaction) => ({
+            id: transaction.id,
+            title: transaction.description,
+            amount: Number(transaction.amount),
+            date: transaction.date,
+            category: transaction.categories?.name ?? "Uncategorized",
+            account: transaction.accounts?.name ?? "Account",
+          })),
+        );
+      } catch (error) {
+        console.error(error);
+        setHasError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadBudget();
+  }, [params.id]);
 
   const pageData = useMemo(() => {
     if (!budget) return null;
@@ -427,10 +481,6 @@ export default function BudgetDetailPage() {
     const statusConfig = getStatusConfig(status);
     const amountDifference = calculateRemainingAmount(budget.spent, budget.budget);
     const projection = calculateProjection(budget);
-    const transactions = relatedTransactions.filter(
-      (transaction) => transaction.category === budget.category
-    );
-
     return {
       percentageUsed,
       roundedPercentage: Math.round(percentageUsed),
@@ -446,12 +496,12 @@ export default function BudgetDetailPage() {
         projection
       ),
     };
-  }, [budget]);
+  }, [budget, transactions]);
 
   const retry = () => {
     setHasError(false);
     setIsLoading(true);
-    window.setTimeout(() => setIsLoading(false), 600);
+    window.location.reload();
   };
 
   if (isLoading) {

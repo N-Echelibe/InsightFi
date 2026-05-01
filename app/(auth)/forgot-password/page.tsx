@@ -8,6 +8,7 @@ import FormMessage from '@/components/auth/form-message'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -42,12 +43,18 @@ export default function ForgotPasswordPage() {
     }
 
     setIsLoading(true)
-    // TODO: Connect email sending logic here
-    // This is a mock submission with loading state
-    setTimeout(() => {
-      setIsSubmitted(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+
+    if (error) {
+      setError(error.message)
       setIsLoading(false)
-    }, 1500)
+      return
+    }
+
+    setIsSubmitted(true)
+    setIsLoading(false)
   }
 
   if (isSubmitted) {
@@ -60,7 +67,7 @@ export default function ForgotPasswordPage() {
           <div className="space-y-6">
             <FormMessage
               type="success"
-              message="Password reset flow placeholder. Connect email reset logic here later."
+              message="Password reset instructions have been sent to your email."
             />
 
             <div className="text-center">

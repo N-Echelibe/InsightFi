@@ -7,7 +7,7 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-const budgets = [
+const defaultBudgets = [
   {
     category: "Food & Dining",
     spent: 680,
@@ -34,7 +34,16 @@ const budgets = [
   },
 ];
 
-export function BudgetOverview() {
+export function BudgetOverview({
+  budgets = defaultBudgets,
+}: {
+  budgets?: Array<{
+    category: string;
+    spent: number;
+    budget: number;
+    color?: string;
+  }>;
+}) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">

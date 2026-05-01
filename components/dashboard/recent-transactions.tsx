@@ -13,7 +13,7 @@ import {
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-const transactions = [
+const defaultTransactions = [
   {
     id: 1,
     name: "Starbucks",
@@ -61,7 +61,19 @@ const transactions = [
   },
 ];
 
-export function RecentTransactions() {
+export function RecentTransactions({
+  transactions = defaultTransactions,
+}: {
+  transactions?: Array<{
+    id: string | number;
+    name: string;
+    category: string;
+    amount: number;
+    date: string;
+    icon?: typeof Coffee;
+    color?: string;
+  }>;
+}) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -77,14 +89,17 @@ export function RecentTransactions() {
       </CardHeader>
       <CardContent>
         <div className="space-y-1">
-          {transactions.map((transaction) => (
-            <div
-              key={transaction.id}
-            className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-          >
+          {transactions.map((transaction) => {
+            const Icon = transaction.icon ?? Coffee;
+
+            return (
+              <div
+                key={transaction.id}
+                className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+              >
               <div className="flex min-w-0 items-center gap-3">
                 <div className={cn("shrink-0 p-2 rounded-lg", transaction.color)}>
-                  <transaction.icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{transaction.name}</p>
@@ -108,7 +123,8 @@ export function RecentTransactions() {
                 </p>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
     </Card>

@@ -7,6 +7,7 @@ import AuthCard from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
 import FormMessage from '@/components/auth/form-message'
 import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase'
 
 export default function ResetPasswordPage() {
   const [formData, setFormData] = useState({
@@ -60,12 +61,18 @@ export default function ResetPasswordPage() {
     }
 
     setIsLoading(true)
-    // TODO: Connect password update logic here
-    // This is a mock submission with loading state
-    setTimeout(() => {
-      setIsSubmitted(true)
+    const { error } = await supabase.auth.updateUser({
+      password: formData.password,
+    })
+
+    if (error) {
+      setErrors({ password: error.message })
       setIsLoading(false)
-    }, 1500)
+      return
+    }
+
+    setIsSubmitted(true)
+    setIsLoading(false)
   }
 
   if (isSubmitted) {
@@ -78,7 +85,7 @@ export default function ResetPasswordPage() {
           <div className="space-y-6">
             <FormMessage
               type="success"
-              message="Password reset placeholder. Connect password update logic here later."
+              message="Your password has been updated."
             />
 
             <Button asChild className="w-full">

@@ -19,7 +19,7 @@ import {
 } from "recharts";
 import { useState } from "react";
 
-const data = [
+const defaultData = [
   { name: "Jan", income: 6500, expenses: 4200 },
   { name: "Feb", income: 6800, expenses: 3900 },
   { name: "Mar", income: 7200, expenses: 4800 },
@@ -34,7 +34,11 @@ const data = [
   { name: "Dec", income: 9200, expenses: 6100 },
 ];
 
-export function SpendingChart() {
+export function SpendingChart({
+  data = defaultData,
+}: {
+  data?: Array<{ name: string; income: number; expenses: number }>;
+}) {
   const [period, setPeriod] = useState("12m");
 
   return (

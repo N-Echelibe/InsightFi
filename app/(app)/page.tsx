@@ -24,18 +24,65 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { CardSkeleton } from "@/components/skeletons";
 import { ErrorState } from "@/components/states";
+import api from "@/lib/api";
+
+type DashboardSummary = {
+  totalBalance: number;
+  monthlyIncome: number;
+  monthlyExpenses: number;
+  savingsRate: number;
+};
 
 export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [summary, setSummary] = useState<DashboardSummary>({
+    totalBalance: 0,
+    monthlyIncome: 0,
+    monthlyExpenses: 0,
+    savingsRate: 0,
+  });
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [cashflow, setCashflow] = useState<any[]>([]);
+  const [budgets, setBudgets] = useState<any[]>([]);
 
   useEffect(() => {
-    // Simulate data loading
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
+    const loadDashboard = async () => {
+      try {
+        setHasError(false);
+        setIsLoading(true);
 
-    return () => clearTimeout(timer);
+        const [
+          summaryResponse,
+          accountsResponse,
+          recentResponse,
+          cashflowResponse,
+          budgetsResponse,
+        ] = await Promise.all([
+          api.get<DashboardSummary>("/dashboard/summary"),
+          api.get<{ accounts: any[]; data?: any[] }>("/accounts"),
+          api.get<{ transactions: any[] }>("/dashboard/recent-transactions"),
+          api.get<{ cashflow: any[] }>("/dashboard/cashflow", {
+            query: { period: "12m" },
+          }),
+          api.get<{ budgets?: any[]; data?: any[] }>("/budgets"),
+        ]);
+
+        setSummary(summaryResponse);
+        setAccounts(accountsResponse.accounts ?? accountsResponse.data ?? []);
+        setRecentTransactions(recentResponse.transactions);
+        setCashflow(cashflowResponse.cashflow);
+        setBudgets(budgetsResponse.budgets ?? budgetsResponse.data ?? []);
+      } catch (error) {
+        console.error(error);
+        setHasError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadDashboard();
   }, []);
 
   if (isLoading) {
@@ -199,8 +246,8 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
           title="Total Balance"
-          value={144798.57}
-          change="+2.5% from last month"
+          value={summary.totalBalance}
+          change="Across all accounts"
           trend="up"
           icon={Wallet}
           iconColor="bg-primary/10 text-primary"
@@ -208,8 +255,8 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Monthly Income"
-          value={8450.0}
-          change="+12.3% from last month"
+          value={summary.monthlyIncome}
+          change="Current period"
           trend="up"
           icon={TrendingUp}
           iconColor="bg-success/10 text-success"
@@ -217,8 +264,8 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Monthly Expenses"
-          value={5230.45}
-          change="+5.2% from last month"
+          value={summary.monthlyExpenses}
+          change="Current period"
           trend="down"
           icon={TrendingDown}
           iconColor="bg-destructive/10 text-destructive"
@@ -226,8 +273,8 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Savings Rate"
-          value="38%"
-          change="+3% from last month"
+          value={`${summary.savingsRate}%`}
+          change="Income after expenses"
           trend="up"
           icon={PiggyBank}
           iconColor="bg-chart-4/10 text-chart-4"
@@ -238,8 +285,20 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column - Charts & Spending Breakdown */}
         <div className="lg:col-span-2 space-y-8">
-          <SpendingChart />
-          <RecentTransactions />
+          <SpendingChart data={cashflow} />
+          <RecentTransactions
+            transactions={recentTransactions.map((transaction) => ({
+              id: transaction.id,
+              name: transaction.description,
+              category: transaction.categories?.name ?? "Uncategorized",
+              amount:
+                transaction.type === "income"
+                  ? Number(transaction.amount)
+                  : -Number(transaction.amount),
+              date: new Date(transaction.date).toLocaleDateString(),
+              color: transaction.categories?.color,
+            }))}
+          />
           <SpendingBreakdownCard />
           <SmartRecommendationsCard />
         </div>
@@ -247,8 +306,20 @@ export default function DashboardPage() {
         {/* Right Column - Sidebar */}
         <div className="space-y-8">
           <FinancialProfileCard />
-          <AccountsCard />
-          <BudgetOverview />
+          <AccountsCard
+            accounts={accounts.map((account) => ({
+              name: account.name,
+              type: account.type,
+              balance: Number(account.balance ?? 0),
+            }))}
+          />
+          <BudgetOverview
+            budgets={budgets.slice(0, 4).map((budget) => ({
+              category: budget.categories?.name ?? budget.category_id?.name ?? "Budget",
+              spent: Number(budget.spent ?? budget.expense ?? 0),
+              budget: Number(budget.budget ?? budget.amount ?? 0),
+            }))}
+          />
           <SavingsGoals />
           <CashRunwayAlertCard />
         </div>

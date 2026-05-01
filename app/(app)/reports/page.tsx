@@ -47,6 +47,9 @@ import {
 } from "recharts";
 
 import { cn } from "@/lib/utils";
+import api from "@/lib/api";
+import axios from "axios";
+import { supabase } from "@/lib/supabase";
 
 const monthlyData = [
   { month: "Jan", income: 6500, expenses: 4200, savings: 2300 },
@@ -121,23 +124,86 @@ export default function ReportsPage() {
   const [reportType, setReportType] = useState("spending");
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [summary, setSummary] = useState({
+    totalIncome: 0,
+    totalExpenses: 0,
+    totalSavings: 0,
+    savingsRate: 0,
+  });
+  const [monthlyBreakdown, setMonthlyBreakdown] = useState(monthlyData);
+  const [categories, setCategories] = useState(categoryBreakdown);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
+    const loadReports = async () => {
+      try {
+        setHasError(false);
+        setIsLoading(true);
 
-    return () => clearTimeout(timer);
-  }, []);
+        const response = await api.get<any>("/reports", {
+          query: { range: dateRange, type: reportType },
+        });
 
-  const totalIncome = monthlyData.reduce((sum, m) => sum + m.income, 0);
-  const totalExpenses = monthlyData.reduce((sum, m) => sum + m.expenses, 0);
-  const totalSavings = totalIncome - totalExpenses;
-  const savingsRate = Math.round((totalSavings / totalIncome) * 100);
+        setSummary(response.summary);
+        setMonthlyBreakdown(
+          (response.monthlyBreakdown ?? []).map((item: any) => ({
+            month: item.label ?? item.month,
+            income: Number(item.income ?? 0),
+            expenses: Number(item.expenses ?? 0),
+            savings: Number(item.savings ?? 0),
+          })),
+        );
+        setCategories(
+          (response.categoryBreakdown ?? []).map((item: any, index: number) => ({
+            name: item.name,
+            value: Number(item.value ?? 0),
+            color: item.color?.startsWith("#")
+              ? item.color
+              : categoryBreakdown[index % categoryBreakdown.length]?.color ?? "#6b7280",
+          })),
+        );
+      } catch (error) {
+        console.error(error);
+        setHasError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const handleExport = (format: "pdf" | "csv") => {
-    // In real implementation, generate and download the report
-    console.log(`Exporting report as ${format}`);
+    loadReports();
+  }, [dateRange, reportType]);
+
+  const totalIncome = summary.totalIncome;
+  const totalExpenses = summary.totalExpenses;
+  const totalSavings = summary.totalSavings;
+  const savingsRate = summary.savingsRate;
+
+  const handleExport = async (format: "pdf" | "csv") => {
+    if (format === "pdf") {
+      window.print();
+      return;
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const response = await axios.post(
+      `${process.env.NEXT_PUBLIC_API}/reports/export`,
+      { format: "csv", range: dateRange, type: reportType },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        responseType: "blob",
+      },
+    );
+    const blob = response.data;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "financial-report.csv";
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   if (isLoading) {
@@ -431,7 +497,7 @@ export default function ReportsPage() {
                     />
                   </AreaChart>
                 ) : (
-                  <BarChart data={monthlyData}>
+                  <BarChart data={monthlyBreakdown}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis
@@ -468,7 +534,7 @@ export default function ReportsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={categoryBreakdown}
+                    data={categories}
                     cx="50%"
                     cy="50%"
                     innerRadius={50}
@@ -476,7 +542,7 @@ export default function ReportsPage() {
                     paddingAngle={2}
                     dataKey="value"
                   >
-                    {categoryBreakdown.map((entry, index) => (
+                    {categories.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -492,7 +558,7 @@ export default function ReportsPage() {
               </ResponsiveContainer>
             </div>
             <div className="space-y-2 mt-4">
-              {categoryBreakdown.map((item) => (
+              {categories.map((item) => (
                 <div key={item.name} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div
@@ -539,7 +605,7 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {monthlyData.map((month) => {
+                {monthlyBreakdown.map((month) => {
                   const rate = Math.round((month.savings / month.income) * 100);
                   return (
                     <tr

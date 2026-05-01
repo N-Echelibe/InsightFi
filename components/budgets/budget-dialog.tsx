@@ -32,7 +32,8 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface Budget {
-  id: number;
+  id: number | string;
+  category_id?: string;
   category: string;
   spent: number;
   budget: number;
@@ -47,9 +48,27 @@ interface BudgetDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   budget?: Budget | null;
+  categories?: Array<{ id: string; name: string; type?: string }>;
+  onSubmit?: (budget: {
+    id?: number | string;
+    category_id: string;
+    amount: number;
+    period: string;
+    start_date?: string;
+    end_date?: string;
+    recurring: boolean;
+    alert: boolean;
+    alert_threshold: number;
+  }) => Promise<void>;
 }
 
-export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) {
+export function BudgetDialog({
+  open,
+  onOpenChange,
+  budget,
+  categories = [],
+  onSubmit,
+}: BudgetDialogProps) {
   const [category, setCategory] = useState("");
   const [amount, setAmount] = useState("");
   const [alertEnabled, setAlertEnabled] = useState(true);
@@ -60,7 +79,7 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
 
   useEffect(() => {
     if (budget) {
-      setCategory(budget.category);
+      setCategory(budget.category_id ?? budget.category);
       setAmount(budget.budget.toString());
       setAlertEnabled(budget.alerts);
       setBudgetType(budget.type || "monthly");
@@ -77,8 +96,30 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
     }
   }, [budget]);
 
-  const handleSubmit = () => {
-    onOpenChange(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!category || !amount) return;
+
+    const isCustomRange = budgetType === "onetime" || budgetType === "custom";
+
+    try {
+      setIsSaving(true);
+      await onSubmit?.({
+        id: budget?.id,
+        category_id: category,
+        amount: Number(amount),
+        period: budgetType,
+        start_date: isCustomRange && startDate ? startDate.toISOString() : undefined,
+        end_date: isCustomRange && endDate ? endDate.toISOString() : undefined,
+        recurring: ["weekly", "monthly", "yearly"].includes(budgetType),
+        alert: alertEnabled,
+        alert_threshold: alertThreshold[0],
+      });
+      onOpenChange(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -101,16 +142,13 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Food & Dining">Food & Dining</SelectItem>
-                <SelectItem value="Transportation">Transportation</SelectItem>
-                <SelectItem value="Shopping">Shopping</SelectItem>
-                <SelectItem value="Housing">Housing</SelectItem>
-                <SelectItem value="Utilities">Utilities</SelectItem>
-                <SelectItem value="Entertainment">Entertainment</SelectItem>
-                <SelectItem value="Health">Health</SelectItem>
-                <SelectItem value="Travel">Travel</SelectItem>
-                <SelectItem value="Education">Education</SelectItem>
-                <SelectItem value="Personal">Personal</SelectItem>
+                {categories
+                  .filter((item) => !item.type || item.type === "expense")
+                  .map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -174,7 +212,7 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
                     <Calendar
                       mode="single"
                       selected={startDate || undefined}
-                      onSelect={setStartDate}
+                      onSelect={(selected) => setStartDate(selected ?? null)}
                       initialFocus
                     />
                   </PopoverContent>
@@ -200,7 +238,7 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
                     <Calendar
                       mode="single"
                       selected={endDate || undefined}
-                      onSelect={setEndDate}
+                      onSelect={(selected) => setEndDate(selected ?? null)}
                       initialFocus
                     />
                   </PopoverContent>
@@ -251,7 +289,9 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit}>{budget ? "Update" : "Create"}</Button>
+          <Button onClick={handleSubmit} disabled={isSaving}>
+            {isSaving ? "Saving..." : budget ? "Update" : "Create"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

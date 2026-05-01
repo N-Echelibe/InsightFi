@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,9 +23,29 @@ import {
   LogOut,
   Settings,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export function TopNav() {
+  const router = useRouter();
   const { setTheme, theme } = useTheme();
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+  }, []);
+
+  const fullName = String(user?.user_metadata?.full_name || user?.email || "User");
+  const initials = fullName
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.replace("/login");
+  };
 
   return (
     <header className="sticky top-0 z-50 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -92,7 +115,7 @@ export function TopNav() {
                 <Avatar className="h-9 w-9">
                   <AvatarImage src="/avatar.png" alt="User" />
                   <AvatarFallback className="bg-primary text-primary-foreground">
-                    JD
+                    {initials || "IF"}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -101,13 +124,13 @@ export function TopNav() {
               <div className="flex items-center gap-2 p-2">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    JD
+                    {initials || "IF"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium">John Doe</span>
+                  <span className="text-sm font-medium">{fullName}</span>
                   <span className="text-xs text-muted-foreground">
-                    john@example.com
+                    {user?.email}
                   </span>
                 </div>
               </div>
@@ -121,7 +144,7 @@ export function TopNav() {
                 Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Log out
               </DropdownMenuItem>

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import AuthLayout from '@/components/auth/auth-layout'
 import AuthCard from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
@@ -10,8 +11,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
+  const router = useRouter()
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -65,20 +68,22 @@ export default function LoginPage() {
     }
 
     setIsLoading(true)
-    // TODO: Connect real authentication here
-    // This is a mock submission with loading state
-    setTimeout(() => {
-      setSubmitMessage({
-        type: 'success',
-        text: 'Login placeholder - Connect real authentication later.',
-      })
+    setSubmitMessage(null)
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: formData.email.trim(),
+      password: formData.password,
+    })
+
+    if (error) {
+      setSubmitMessage({ type: 'error', text: error.message })
       setIsLoading(false)
-      // Reset form after showing message
-      setTimeout(() => {
-        setFormData({ email: '', password: '', rememberMe: false })
-        setSubmitMessage(null)
-      }, 2000)
-    }, 1500)
+      return
+    }
+
+    const nextPath = new URLSearchParams(window.location.search).get('next')
+    router.replace(nextPath || '/')
+    router.refresh()
   }
 
   return (

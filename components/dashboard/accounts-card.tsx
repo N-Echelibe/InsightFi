@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Building2, CreditCard, Landmark, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const accounts = [
+const defaultAccounts = [
   {
     name: "Main Checking",
     bank: "Chase Bank",
@@ -40,7 +40,18 @@ const accounts = [
   },
 ];
 
-export function AccountsCard() {
+export function AccountsCard({
+  accounts = defaultAccounts,
+}: {
+  accounts?: Array<{
+    name: string;
+    bank?: string;
+    balance: number;
+    type: string;
+    icon?: typeof Building2;
+    color?: string;
+  }>;
+}) {
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
 
   return (
@@ -63,35 +74,39 @@ export function AccountsCard() {
         </div>
 
         <div className="space-y-3">
-          {accounts.map((account) => (
-            <div
-              key={account.name}
-              className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <div className={cn("shrink-0 p-2 rounded-lg", account.color)}>
-                  <account.icon className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{account.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {account.bank}
-                  </p>
-                </div>
-              </div>
-              <p
-                className={cn(
-                  "shrink-0 text-sm font-semibold",
-                  account.balance < 0 && "text-destructive"
-                )}
+          {accounts.map((account) => {
+            const Icon = account.icon ?? Building2;
+
+            return (
+              <div
+                key={account.name}
+                className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
               >
-                {account.balance < 0 ? "-" : ""}$
-                {Math.abs(account.balance).toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                })}
-              </p>
-            </div>
-          ))}
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className={cn("shrink-0 p-2 rounded-lg", account.color)}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{account.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {account.bank ?? account.type}
+                    </p>
+                  </div>
+                </div>
+                <p
+                  className={cn(
+                    "shrink-0 text-sm font-semibold",
+                    account.balance < 0 && "text-destructive"
+                  )}
+                >
+                  {account.balance < 0 ? "-" : ""}$
+                  {Math.abs(account.balance).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>

@@ -19,6 +19,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import api from "@/lib/api";
 
 const formatCurrency = (value: number) =>
   `${"\u20a6"}${value.toLocaleString("en-NG", {
@@ -157,13 +158,79 @@ function getRiskBadge(status: string) {
 export default function InsightsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [summary, setSummary] = useState<any[]>(summaryCards);
+  const [patterns, setPatterns] = useState<any[]>(spendingPatterns);
+  const [risks, setRisks] = useState<any[]>(budgetRisks);
+  const [tips, setTips] = useState<string[]>(recommendations);
+  const [profile, setProfile] = useState(spenderProfile);
+  const [incomePattern, setIncomePattern] = useState(incomeData);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
+    const loadInsights = async () => {
+      try {
+        setHasError(false);
+        setIsLoading(true);
 
-    return () => clearTimeout(timer);
+        const response = await api.get<any>("/insights");
+        setSummary([
+          {
+            title: "Savings Rate",
+            value: `${response.summary?.savingsRate ?? 0}%`,
+            change: "Current period",
+            trend: "neutral" as const,
+            icon: TrendingUp,
+            iconColor: "bg-success/10 text-success",
+          },
+          {
+            title: "Budget Risk",
+            value: response.summary?.budgetRisk ?? "Low",
+            change: "Based on active budgets",
+            trend: "neutral" as const,
+            icon: AlertCircle,
+            iconColor: "bg-amber-500/10 text-amber-600",
+          },
+          {
+            title: "Spending Stability",
+            value: response.summary?.spendingStability ?? "No data",
+            change: "Transaction activity",
+            trend: "neutral" as const,
+            icon: BarChart3,
+            iconColor: "bg-chart-2/10 text-chart-2",
+          },
+          {
+            title: "Spender Type",
+            value: response.summary?.spenderType ?? "Moderate",
+            change: "Current profile",
+            trend: "neutral" as const,
+            icon: Target,
+            iconColor: "bg-primary/10 text-primary",
+          },
+        ]);
+        setPatterns(response.spendingPatterns ?? []);
+        setRisks(response.budgetRisks ?? []);
+        setTips(response.recommendations ?? []);
+        setProfile({
+          type: response.summary?.spenderType ?? "Moderate Spender",
+          description: "Calculated from your recent income, spending, and budget usage.",
+        });
+        setIncomePattern({
+          regularity: response.incomePattern?.regularity ?? "No data",
+          mainSource: "Transactions",
+          frequency: "Current selected period",
+          suggestion:
+            response.incomePattern?.totalIncome > response.incomePattern?.totalExpenses
+              ? "Your income is currently ahead of expenses."
+              : "Your expenses are close to or above income. Review flexible categories.",
+        });
+      } catch (error) {
+        console.error(error);
+        setHasError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInsights();
   }, []);
 
   if (isLoading) {
@@ -302,7 +369,7 @@ export default function InsightsPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {summaryCards.map((card) => (
+        {summary.map((card) => (
           <StatCard
             key={card.title}
             title={card.title}
@@ -326,7 +393,7 @@ export default function InsightsPage() {
             </CardHeader>
             <CardContent>
               <div className="divide-y">
-                {spendingPatterns.map((pattern) => (
+                {patterns.map((pattern) => (
                   <div
                     key={pattern.title}
                     className="flex items-start justify-between gap-4 py-4 first:pt-0 last:pb-0"
@@ -354,12 +421,12 @@ export default function InsightsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {budgetRisks.map((risk) => {
+              {risks.map((risk) => {
                 const badge = getRiskBadge(risk.status);
-                const progress = Math.min((risk.spent / risk.budget) * 100, 100);
+                  const progress = risk.budget > 0 ? Math.min((risk.spent / risk.budget) * 100, 100) : 0;
 
                 return (
-                  <div key={risk.category} className="rounded-lg border p-4">
+                  <div key={risk.budget_id ?? risk.category} className="rounded-lg border p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-medium">{risk.category}</p>
@@ -409,10 +476,10 @@ export default function InsightsPage() {
                   Current Profile
                 </p>
                 <p className="mt-1 text-lg font-bold text-primary">
-                  {spenderProfile.type}
+                  {profile.type}
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {spenderProfile.description}
+                  {profile.description}
                 </p>
               </div>
               <Separator />
@@ -443,7 +510,7 @@ export default function InsightsPage() {
                     Regularity
                   </span>
                   <span className="text-sm font-medium">
-                    {incomeData.regularity}
+                    {incomePattern.regularity}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
@@ -451,7 +518,7 @@ export default function InsightsPage() {
                     Main Source
                   </span>
                   <span className="text-sm font-medium text-right">
-                    {incomeData.mainSource}
+                    {incomePattern.mainSource}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
@@ -459,13 +526,13 @@ export default function InsightsPage() {
                     Frequency
                   </span>
                   <span className="text-sm font-medium text-right">
-                    {incomeData.frequency}
+                    {incomePattern.frequency}
                   </span>
                 </div>
               </div>
               <div className="rounded-lg border bg-muted/40 p-3">
                 <p className="text-sm text-muted-foreground">
-                  {incomeData.suggestion}
+                  {incomePattern.suggestion}
                 </p>
               </div>
             </CardContent>
@@ -482,7 +549,7 @@ export default function InsightsPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {recommendations.map((recommendation) => (
+            {tips.map((recommendation) => (
               <div
                 key={recommendation}
                 className="flex gap-3 rounded-lg border p-3 text-sm"

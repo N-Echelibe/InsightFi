@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,8 +47,11 @@ import {
   CalendarIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import api from "@/lib/api";
+import axios from "axios";
+import { supabase } from "@/lib/supabase";
 import { AddTransactionDialog } from "@/components/transactions/add-transaction-dialog";
-import { EmptyState } from "@/components/states";
+import { EmptyState, ErrorState } from "@/components/states";
 import Loading from "./loading";
 
 type Transaction = {
@@ -68,6 +71,17 @@ type Transaction = {
   accounts?: {
     name?: string;
   };
+};
+
+type Account = {
+  id: string;
+  name: string;
+};
+
+type Category = {
+  id: string;
+  name: string;
+  type?: string;
 };
 
 const sampleTransactions: Transaction[] = [
@@ -235,6 +249,17 @@ const sampleTransactions: Transaction[] = [
 
 export default function TransactionsPage() {
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [reloadTick, setReloadTick] = useState(0);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 8,
+    total: 0,
+    pages: 1,
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
@@ -245,12 +270,81 @@ export default function TransactionsPage() {
   const itemsPerPage = 8;
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
+    const loadTransactions = async () => {
+      try {
+        setHasError(false);
+        setIsLoading(true);
 
-    return () => clearTimeout(timer);
-  }, []);
+        const getDateQuery = () => {
+          const now = new Date();
+          const query: Record<string, string> = {};
+
+          if (dateFilter === "7d") {
+            const start = new Date(now);
+            start.setDate(start.getDate() - 7);
+            query.startDate = start.toISOString();
+          } else if (dateFilter === "30d") {
+            const start = new Date(now);
+            start.setDate(start.getDate() - 30);
+            query.startDate = start.toISOString();
+          } else if (dateFilter === "90d") {
+            const start = new Date(now);
+            start.setDate(start.getDate() - 90);
+            query.startDate = start.toISOString();
+          } else if (dateFilter === "6m") {
+            const start = new Date(now);
+            start.setMonth(start.getMonth() - 6);
+            query.startDate = start.toISOString();
+          } else if (dateFilter === "custom" && customDateStart && customDateEnd) {
+            query.startDate = customDateStart.toISOString();
+            const end = new Date(customDateEnd);
+            end.setHours(23, 59, 59, 999);
+            query.endDate = end.toISOString();
+          }
+
+          return query;
+        };
+
+        const [transactionsResponse, accountsResponse, categoriesResponse] =
+          await Promise.all([
+            api.get<{
+              transactions: Transaction[];
+              pagination: typeof pagination;
+            }>("/transactions", {
+              query: {
+                page: currentPage,
+                limit: itemsPerPage,
+                search: searchQuery.trim(),
+                category_id: categoryFilter === "all" ? undefined : categoryFilter,
+                ...getDateQuery(),
+              },
+            }),
+            api.get<{ accounts: Account[]; data?: Account[] }>("/accounts"),
+            api.get<{ categories: Category[] }>("/categories"),
+          ]);
+
+        setTransactions(transactionsResponse.transactions);
+        setPagination(transactionsResponse.pagination);
+        setAccounts(accountsResponse.accounts ?? accountsResponse.data ?? []);
+        setCategories(categoriesResponse.categories);
+      } catch (error) {
+        console.error(error);
+        setHasError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadTransactions();
+  }, [
+    categoryFilter,
+    customDateEnd,
+    customDateStart,
+    currentPage,
+    dateFilter,
+    reloadTick,
+    searchQuery,
+  ]);
 
   const resolveIcon = (iconName?: string) => {
     if (!iconName) {
@@ -269,93 +363,69 @@ export default function TransactionsPage() {
     return icons[normalized] || LucideIcons.Tag;
   };
 
-  const filteredTransactions = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-
-    const getDateRange = () => {
-      const now = new Date();
-      let startDate: Date | null = null;
-      let endDate: Date | null = null;
-
-      if (dateFilter === "7d") {
-        startDate = new Date(now);
-        startDate.setDate(startDate.getDate() - 7);
-      } else if (dateFilter === "30d") {
-        startDate = new Date(now);
-        startDate.setDate(startDate.getDate() - 30);
-      } else if (dateFilter === "90d") {
-        startDate = new Date(now);
-        startDate.setDate(startDate.getDate() - 90);
-      } else if (dateFilter === "6m") {
-        startDate = new Date(now);
-        startDate.setMonth(startDate.getMonth() - 6);
-      } else if (dateFilter === "custom" && customDateStart && customDateEnd) {
-        startDate = customDateStart;
-        endDate = customDateEnd;
-      }
-
-      if (endDate) {
-        endDate = new Date(endDate);
-        endDate.setHours(23, 59, 59, 999);
-      }
-
-      return { startDate, endDate };
-    };
-
-    const { startDate, endDate } = getDateRange();
-
-    return sampleTransactions.filter((transaction) => {
-      const categoryName = transaction.categories?.name ?? "";
-      const accountName = transaction.accounts?.name ?? "";
-      const transactionDate = new Date(transaction.date);
-      const matchesSearch =
-        !query ||
-        transaction.description.toLowerCase().includes(query) ||
-        categoryName.toLowerCase().includes(query) ||
-        accountName.toLowerCase().includes(query) ||
-        transaction.status.toLowerCase().includes(query);
-      const matchesCategory =
-        categoryFilter === "all" || categoryName === categoryFilter;
-      const matchesStartDate = !startDate || transactionDate >= startDate;
-      const matchesEndDate = !endDate || transactionDate <= endDate;
-
-      return (
-        matchesSearch &&
-        matchesCategory &&
-        matchesStartDate &&
-        matchesEndDate
-      );
-    });
-  }, [
-    categoryFilter,
-    customDateEnd,
-    customDateStart,
-    dateFilter,
-    searchQuery,
-  ]);
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredTransactions.length / itemsPerPage)
-  );
-  const pagination = {
-    page: currentPage,
-    limit: itemsPerPage,
-    total: filteredTransactions.length,
-    pages: totalPages,
-  };
+  const paginatedTransactions = transactions;
+  const totalPages = pagination.pages;
   const startIdx = (pagination.page - 1) * pagination.limit;
-  const paginatedTransactions = filteredTransactions.slice(
-    startIdx,
-    startIdx + pagination.limit
-  );
 
   const handlePageChange = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
 
+  const refreshCurrentPage = () => {
+    setReloadTick((value) => value + 1);
+  };
+
+  const handleCreateTransaction = async (transaction: {
+    account_id: string;
+    amount: number;
+    type: "expense" | "income";
+    category_id: string;
+    description: string;
+    date: string;
+  }) => {
+    await api.post("/transactions", transaction);
+    refreshCurrentPage();
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+    await api.delete(`/transactions/${id}`);
+    setTransactions((items) => items.filter((item) => item.id !== id));
+  };
+
+  const handleExport = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const response = await axios.get(`${process.env.NEXT_PUBLIC_API}/transactions/export?format=csv`, {
+      headers: {
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+      responseType: "blob",
+    });
+    const blob = response.data;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "transactions.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (isLoading) {
     return <Loading />;
+  }
+
+  if (hasError) {
+    return (
+      <ErrorState
+        title="Failed to load transactions"
+        description="We couldn't load your transactions. Please try again."
+        onRetry={() => {
+          setHasError(false);
+          refreshCurrentPage();
+        }}
+      />
+    );
   }
 
   return (
@@ -421,15 +491,14 @@ export default function TransactionsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Food & Dining">Food & Dining</SelectItem>
-                <SelectItem value="Transportation">Transportation</SelectItem>
-                <SelectItem value="Shopping">Shopping</SelectItem>
-                <SelectItem value="Housing">Housing</SelectItem>
-                <SelectItem value="Subscriptions">Subscriptions</SelectItem>
-                <SelectItem value="Income">Income</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" className="gap-2 bg-transparent">
+            <Button variant="outline" className="gap-2 bg-transparent" onClick={handleExport}>
               <Download className="h-4 w-4" />
               Export
             </Button>
@@ -600,7 +669,10 @@ export default function TransactionsPage() {
                             <Tag className="h-4 w-4 mr-2" />
                             Categorize
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDeleteTransaction(transaction.id)}
+                          >
                             <Trash2 className="h-4 w-4 mr-2" />
                             Delete
                           </DropdownMenuItem>
@@ -658,7 +730,13 @@ export default function TransactionsPage() {
       </Card>
 
       {/* Dialogs */}
-      <AddTransactionDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
+      <AddTransactionDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        accounts={accounts}
+        categories={categories}
+        onSubmit={handleCreateTransaction}
+      />
     </div>
   );
 }

@@ -27,22 +27,31 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import api from "@/lib/api";
 import { BudgetDialog } from "@/components/budgets/budget-dialog";
 import { SavingsBuckets } from "@/components/budgets/savings-buckets";
 import { CardSkeleton } from "@/components/skeletons";
 import { ErrorState, EmptyState } from "@/components/states";
 
 type BudgetItem = {
-  id: number;
+  id: string;
+  category_id?: string;
   category: string;
   spent: number;
   budget: number;
   icon: LucideIcon;
   alerts: boolean;
-  type: "weekly" | "monthly" | "yearly" | "custom";
+  type: "daily" | "weekly" | "monthly" | "yearly" | "custom" | "onetime";
   createdDate?: Date;
   startDate?: Date;
   endDate?: Date;
+};
+
+type Category = {
+  id: string;
+  name: string;
+  type?: string;
+  icon?: string;
 };
 
 const formatCurrency = (value: number) =>
@@ -51,9 +60,9 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   })}`;
 
-const budgets: BudgetItem[] = [
+const sampleBudgets: BudgetItem[] = [
   {
-    id: 1,
+    id: "1",
     category: "Food & Dining",
     spent: 680,
     budget: 800,
@@ -63,7 +72,7 @@ const budgets: BudgetItem[] = [
     createdDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
   },
   {
-    id: 2,
+    id: "2",
     category: "Transportation",
     spent: 320,
     budget: 400,
@@ -73,7 +82,7 @@ const budgets: BudgetItem[] = [
     createdDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
   },
   {
-    id: 3,
+    id: "3",
     category: "Shopping",
     spent: 450,
     budget: 350,
@@ -83,7 +92,7 @@ const budgets: BudgetItem[] = [
     createdDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
   },
   {
-    id: 4,
+    id: "4",
     category: "Housing",
     spent: 2200,
     budget: 2200,
@@ -93,7 +102,7 @@ const budgets: BudgetItem[] = [
     createdDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
   },
   {
-    id: 5,
+    id: "5",
     category: "Utilities",
     spent: 180,
     budget: 250,
@@ -103,7 +112,7 @@ const budgets: BudgetItem[] = [
     createdDate: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000),
   },
   {
-    id: 6,
+    id: "6",
     category: "Health",
     spent: 120,
     budget: 200,
@@ -113,7 +122,7 @@ const budgets: BudgetItem[] = [
     createdDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
   },
   {
-    id: 7,
+    id: "7",
     category: "Entertainment",
     spent: 180,
     budget: 200,
@@ -123,7 +132,7 @@ const budgets: BudgetItem[] = [
     createdDate: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000),
   },
   {
-    id: 8,
+    id: "8",
     category: "Travel",
     spent: 0,
     budget: 500,
@@ -136,10 +145,12 @@ const budgets: BudgetItem[] = [
 ];
 
 const budgetTypeLabels: Record<BudgetItem["type"], string> = {
+  daily: "Daily",
   weekly: "Weekly",
   monthly: "Monthly",
   yearly: "Yearly",
   custom: "Custom Range",
+  onetime: "One-Time",
 };
 
 function getBudgetStatus(percentageUsed: number) {
@@ -272,16 +283,65 @@ export default function BudgetsPage() {
   const router = useRouter();
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const selectedBudget: BudgetItem | null = null;
+  const [budgets, setBudgets] = useState<BudgetItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
+    const loadBudgets = async () => {
+      try {
+        setHasError(false);
+        setIsLoading(true);
 
-    return () => clearTimeout(timer);
-  }, []);
+        const [budgetsResponse, categoriesResponse] = await Promise.all([
+          api.get<{ budgets?: any[]; data?: any[] }>("/budgets"),
+          api.get<{ categories: Category[] }>("/categories", {
+            query: { type: "expense" },
+          }),
+        ]);
+
+        const iconMap: Record<string, LucideIcon> = {
+          car: Car,
+          "gamepad-2": Gamepad2,
+          heart: Heart,
+          home: Home,
+          plane: Plane,
+          "shopping-bag": ShoppingBag,
+          target: Target,
+          utensils: Utensils,
+          wifi: Wifi,
+        };
+
+        const normalized = (budgetsResponse.budgets ?? budgetsResponse.data ?? []).map(
+          (item): BudgetItem => ({
+            id: String(item.id),
+            category_id: item.category_id?.id ?? item.category_id,
+            category: item.categories?.name ?? item.category_id?.name ?? "Budget",
+            spent: Number(item.spent ?? item.expense ?? 0),
+            budget: Number(item.budget ?? item.amount ?? item.limit ?? 0),
+            icon: iconMap[item.categories?.icon ?? item.category_id?.icon] ?? Target,
+            alerts: Boolean(item.alert ?? item.alerts),
+            type: (item.period ?? item.type ?? "monthly") as BudgetItem["type"],
+            startDate: item.start_date ? new Date(item.start_date) : undefined,
+            endDate: item.end_date ? new Date(item.end_date) : undefined,
+            createdDate: item.created_at ? new Date(item.created_at) : undefined,
+          }),
+        );
+
+        setBudgets(normalized);
+        setCategories(categoriesResponse.categories);
+      } catch (error) {
+        console.error(error);
+        setHasError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadBudgets();
+  }, [reloadTick]);
 
   const totalBudget = budgets.reduce((sum, b) => sum + b.budget, 0);
   const totalSpent = budgets.reduce((sum, b) => sum + b.spent, 0);
@@ -303,6 +363,26 @@ export default function BudgetsPage() {
 
     return budgetPercentage > highestPercentage ? budget : highest;
   }, budgets[0]);
+
+  const handleSaveBudget = async (budget: {
+    id?: string | number;
+    category_id: string;
+    amount: number;
+    period: string;
+    start_date?: string;
+    end_date?: string;
+    recurring: boolean;
+    alert: boolean;
+    alert_threshold: number;
+  }) => {
+    if (budget.id) {
+      await api.patch(`/budgets/${budget.id}`, budget);
+    } else {
+      await api.post("/budgets", budget);
+    }
+
+    setReloadTick((value) => value + 1);
+  };
 
   if (isLoading) {
     return (
@@ -396,6 +476,7 @@ export default function BudgetsPage() {
           onRetry={() => {
             setHasError(false);
             setIsLoading(true);
+            setReloadTick((value) => value + 1);
           }}
         />
       </div>
@@ -578,6 +659,8 @@ export default function BudgetsPage() {
         open={budgetDialogOpen}
         onOpenChange={setBudgetDialogOpen}
         budget={selectedBudget}
+        categories={categories}
+        onSubmit={handleSaveBudget}
       />
     </div>
   );

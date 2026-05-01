@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import AuthLayout from '@/components/auth/auth-layout'
 import AuthCard from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
@@ -10,8 +11,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { supabase } from '@/lib/supabase'
 
 export default function SignupPage() {
+  const router = useRouter()
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -52,6 +55,10 @@ export default function SignupPage() {
       newErrors.confirmPassword = 'Passwords do not match.'
     }
 
+    if (!formData.agreeToTerms) {
+      newErrors.agreeToTerms = 'You need to agree to the terms to continue.'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -80,27 +87,37 @@ export default function SignupPage() {
     }
 
     setIsLoading(true)
-    // TODO: Connect real sign-up logic here
-    // This is a mock submission with loading state
-    setTimeout(() => {
-      setSubmitMessage({
-        type: 'success',
-        text: 'Account creation placeholder - Connect real sign-up logic later.',
-      })
+    setSubmitMessage(null)
+
+    const { data, error } = await supabase.auth.signUp({
+      email: formData.email.trim(),
+      password: formData.password,
+      options: {
+        data: {
+          full_name: formData.fullName.trim(),
+          university: formData.university.trim(),
+        },
+      },
+    })
+
+    if (error) {
+      setSubmitMessage({ type: 'error', text: error.message })
       setIsLoading(false)
-      // Reset form after showing message
-      setTimeout(() => {
-        setFormData({
-          fullName: '',
-          email: '',
-          password: '',
-          confirmPassword: '',
-          university: '',
-          agreeToTerms: false,
-        })
-        setSubmitMessage(null)
-      }, 2000)
-    }, 1500)
+      return
+    }
+
+    setSubmitMessage({
+      type: 'success',
+      text: data.session
+        ? 'Account created. Taking you to your dashboard.'
+        : 'Account created. Check your email to confirm your account.',
+    })
+    setIsLoading(false)
+
+    if (data.session) {
+      router.replace('/')
+      router.refresh()
+    }
   }
 
   return (
@@ -192,6 +209,9 @@ export default function SignupPage() {
               I agree to the terms and privacy policy
             </Label>
           </div>
+          {errors.agreeToTerms && (
+            <p className="text-sm text-destructive">{errors.agreeToTerms}</p>
+          )}
 
           {submitMessage && (
             <FormMessage type={submitMessage.type} message={submitMessage.text} />

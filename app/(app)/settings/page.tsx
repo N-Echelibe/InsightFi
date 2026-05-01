@@ -38,6 +38,19 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import api from "@/lib/api";
+
+type Account = {
+  id: string | number;
+  name: string;
+  type: string;
+};
+
+type CategoryRecord = {
+  id: string;
+  name: string;
+  type?: string;
+};
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
@@ -45,11 +58,39 @@ export default function SettingsPage() {
   const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
+    const loadSettings = async () => {
+      try {
+        setHasError(false);
+        setIsLoading(true);
 
-    return () => clearTimeout(timer);
+        const [accountsResponse, categoriesResponse, notificationsResponse] =
+          await Promise.all([
+            api.get<{ accounts: Account[]; data?: Account[] }>("/accounts"),
+            api.get<{ categories: CategoryRecord[] }>("/categories"),
+            api.get<{ notifications: any }>("/settings/notifications"),
+          ]);
+
+        setAccounts(accountsResponse.accounts ?? accountsResponse.data ?? []);
+        setCategoryRecords(categoriesResponse.categories);
+        setCategories(categoriesResponse.categories.map((category) => category.name));
+        const nextNotifications = notificationsResponse.notifications;
+        setNotifications({
+          budgetAlerts: Boolean(nextNotifications.budget_alerts),
+          savingsGoals: Boolean(nextNotifications.savings_goals),
+          weeklyReport: Boolean(nextNotifications.weekly_report),
+          transactionAlerts: Boolean(nextNotifications.transaction_alerts),
+          marketUpdates: Boolean(nextNotifications.market_updates),
+          newsletter: Boolean(nextNotifications.newsletter),
+        });
+      } catch (error) {
+        console.error(error);
+        setHasError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSettings();
   }, []);
 
   const [notifications, setNotifications] = useState({
@@ -60,7 +101,23 @@ export default function SettingsPage() {
     marketUpdates: true,
     newsletter: false,
   });
-  const [accounts, setAccounts] = useState([
+
+  const updateNotifications = async (
+    key: keyof typeof notifications,
+    checked: boolean,
+  ) => {
+    const next = { ...notifications, [key]: checked };
+    setNotifications(next);
+    await api.patch("/settings/notifications", {
+      budget_alerts: next.budgetAlerts,
+      savings_goals: next.savingsGoals,
+      weekly_report: next.weeklyReport,
+      transaction_alerts: next.transactionAlerts,
+      market_updates: next.marketUpdates,
+      newsletter: next.newsletter,
+    });
+  };
+  const [accounts, setAccounts] = useState<Account[]>([
     { id: 1, name: "Cash", type: "cash" },
     { id: 2, name: "Savings Account", type: "savings" },
     { id: 3, name: "Current Account", type: "current" },
@@ -68,6 +125,7 @@ export default function SettingsPage() {
   const [newAccountName, setNewAccountName] = useState("");
   const [newAccountType, setNewAccountType] = useState("cash");
   
+  const [categoryRecords, setCategoryRecords] = useState<CategoryRecord[]>([]);
   const [categories, setCategories] = useState([
     "Food & Dining",
     "Transportation",
@@ -78,29 +136,43 @@ export default function SettingsPage() {
   ]);
   const [newCategory, setNewCategory] = useState("");
 
-  const addAccount = () => {
+  const addAccount = async () => {
     if (newAccountName.trim()) {
-      setAccounts([
-        ...accounts,
-        { id: Date.now(), name: newAccountName, type: newAccountType },
-      ]);
+      const response = await api.post<{ account: Account }>("/accounts", {
+        name: newAccountName.trim(),
+        type: newAccountType,
+        currency: "NGN",
+        balance: 0,
+      });
+      setAccounts([response.account, ...accounts]);
       setNewAccountName("");
       setNewAccountType("cash");
     }
   };
 
-  const deleteAccount = (id: number) => {
+  const deleteAccount = async (id: string | number) => {
+    await api.delete(`/accounts/${id}`);
     setAccounts(accounts.filter((acc) => acc.id !== id));
   };
 
-  const addCategory = () => {
+  const addCategory = async () => {
     if (newCategory.trim() && !categories.includes(newCategory)) {
-      setCategories([...categories, newCategory]);
+      const response = await api.post<{ category: CategoryRecord }>("/categories", {
+        name: newCategory.trim(),
+        type: "expense",
+      });
+      setCategoryRecords([...categoryRecords, response.category]);
+      setCategories([...categories, response.category.name]);
       setNewCategory("");
     }
   };
 
-  const deleteCategory = (category: string) => {
+  const deleteCategory = async (category: string) => {
+    const record = categoryRecords.find((item) => item.name === category);
+    if (record?.id) {
+      await api.delete(`/categories/${record.id}`);
+    }
+    setCategoryRecords(categoryRecords.filter((item) => item.name !== category));
     setCategories(categories.filter((c) => c !== category));
   };
 
@@ -340,7 +412,7 @@ export default function SettingsPage() {
                     <Switch
                       checked={notifications.budgetAlerts}
                       onCheckedChange={(checked) =>
-                        setNotifications({ ...notifications, budgetAlerts: checked })
+                        updateNotifications("budgetAlerts", checked)
                       }
                     />
                   </div>
@@ -354,10 +426,7 @@ export default function SettingsPage() {
                     <Switch
                       checked={notifications.transactionAlerts}
                       onCheckedChange={(checked) =>
-                        setNotifications({
-                          ...notifications,
-                          transactionAlerts: checked,
-                        })
+                        updateNotifications("transactionAlerts", checked)
                       }
                     />
                   </div>
@@ -378,7 +447,7 @@ export default function SettingsPage() {
                   <Switch
                     checked={notifications.savingsGoals}
                     onCheckedChange={(checked) =>
-                      setNotifications({ ...notifications, savingsGoals: checked })
+                      updateNotifications("savingsGoals", checked)
                     }
                   />
                 </div>
@@ -399,7 +468,7 @@ export default function SettingsPage() {
                     <Switch
                       checked={notifications.weeklyReport}
                       onCheckedChange={(checked) =>
-                        setNotifications({ ...notifications, weeklyReport: checked })
+                        updateNotifications("weeklyReport", checked)
                       }
                     />
                   </div>
@@ -413,7 +482,7 @@ export default function SettingsPage() {
                     <Switch
                       checked={notifications.marketUpdates}
                       onCheckedChange={(checked) =>
-                        setNotifications({ ...notifications, marketUpdates: checked })
+                        updateNotifications("marketUpdates", checked)
                       }
                     />
                   </div>
@@ -427,7 +496,7 @@ export default function SettingsPage() {
                     <Switch
                       checked={notifications.newsletter}
                       onCheckedChange={(checked) =>
-                        setNotifications({ ...notifications, newsletter: checked })
+                        updateNotifications("newsletter", checked)
                       }
                     />
                   </div>
