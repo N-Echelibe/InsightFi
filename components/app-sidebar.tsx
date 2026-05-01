@@ -7,9 +7,8 @@ import {
   LayoutDashboard,
   ArrowLeftRight,
   PiggyBank,
-  TrendingUp,
+  Lightbulb,
   FileBarChart,
-  MessageSquareText,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -35,19 +34,14 @@ const navItems = [
     icon: PiggyBank,
   },
   {
-    title: "Investments",
-    href: "/investments",
-    icon: TrendingUp,
+    title: "Insights",
+    href: "/insights",
+    icon: Lightbulb,
   },
   {
     title: "Reports",
     href: "/reports",
     icon: FileBarChart,
-  },
-  {
-    title: "AI Assistant",
-    href: "/ai-assistant",
-    icon: MessageSquareText,
   },
   {
     title: "Settings",

@@ -80,7 +80,7 @@ export function SpendingChart() {
                 tick={{ fontSize: 12 }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `$${value / 1000}k`}
+                tickFormatter={(value) => `₦${value / 1000}k`}
                 className="text-muted-foreground"
               />
               <Tooltip
@@ -90,7 +90,7 @@ export function SpendingChart() {
                   borderRadius: "8px",
                   fontSize: "12px",
                 }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
+                formatter={(value: number) => [`₦${value.toLocaleString("en-NG")}`, ""]}
               />
               <Area
                 type="monotone"
@@ -111,7 +111,7 @@ export function SpendingChart() {
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        <div className="flex items-center justify-center gap-6 mt-4">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-4 sm:gap-6">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-[#22c55e]" />
             <span className="text-sm text-muted-foreground">Income</span>
