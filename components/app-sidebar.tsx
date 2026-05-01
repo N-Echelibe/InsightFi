@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   ArrowLeftRight,
   PiggyBank,
-  TrendingUp,
+  Lightbulb,
   FileBarChart,
   Settings,
   ChevronLeft,
@@ -34,9 +34,9 @@ const navItems = [
     icon: PiggyBank,
   },
   {
-    title: "Investments",
-    href: "/investments",
-    icon: TrendingUp,
+    title: "Insights",
+    href: "/insights",
+    icon: Lightbulb,
   },
   {
     title: "Reports",
