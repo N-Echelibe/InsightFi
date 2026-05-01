@@ -1,669 +1,818 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { StatCard } from "@/components/dashboard/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState, ErrorState } from "@/components/states";
+import { CardSkeleton } from "@/components/skeletons";
 import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import * as LucideIcons from "lucide-react";
+  AlertTriangle,
+  ArrowLeft,
+  BookOpen,
+  Bus,
+  CalendarDays,
+  Clock,
+  Gamepad2,
+  HeartHandshake,
+  Home,
+  Lightbulb,
+  Percent,
+  ReceiptText,
+  ShieldCheck,
+  Target,
+  Utensils,
+  Wallet,
+  Wifi,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, Edit, Trash2, AlertTriangle, TrendingUp, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BudgetDialog } from "@/components/budgets/budget-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 
-// Mock transaction data - in real app would come from database
-const allTransactions = [
-  {
-    id: "txn-001",
-    description: "Lunch at restaurant",
-    amount: 5200,
-    date: "2026-04-28",
-    categories: {
-      icon: "utensils",
-      name: "Food & Dining",
-      color: "bg-orange-100 text-orange-700",
-    },
-  },
-  {
-    id: "txn-002",
-    description: "Grocery shopping",
-    amount: 12500,
-    date: "2026-04-27",
-    categories: {
-      icon: "shopping-bag",
-      name: "Food & Dining",
-      color: "bg-orange-100 text-orange-700",
-    },
-  },
-  {
-    id: "txn-003",
-    description: "Coffee break",
-    amount: 1500,
-    date: "2026-04-26",
-    categories: {
-      icon: "coffee",
-      name: "Food & Dining",
-      color: "bg-orange-100 text-orange-700",
-    },
-  },
-  {
-    id: "txn-004",
-    description: "Restaurant dinner",
-    amount: 8400,
-    date: "2026-04-25",
-    categories: {
-      icon: "utensils",
-      name: "Food & Dining",
-      color: "bg-orange-100 text-orange-700",
-    },
-  },
-  {
-    id: "txn-005",
-    description: "Fast food",
-    amount: 3200,
-    date: "2026-04-24",
-    categories: {
-      icon: "utensils",
-      name: "Food & Dining",
-      color: "bg-orange-100 text-orange-700",
-    },
-  },
-];
+type BudgetPeriod = "weekly" | "monthly" | "yearly" | "onetime" | "custom";
+type BudgetStatus = "safe" | "warning" | "over";
 
-// Mock budget data - in real app would come from database
-const allBudgets = [
+type BudgetDetail = {
+  id: number;
+  category: string;
+  name: string;
+  spent: number;
+  budget: number;
+  type: BudgetPeriod;
+  icon: LucideIcon;
+  createdDate?: Date;
+  startDate?: Date;
+  endDate?: Date;
+};
+
+type RelatedTransaction = {
+  id: string;
+  title: string;
+  category: string;
+  date: string;
+  amount: number;
+  account: string;
+};
+
+const dayMs = 24 * 60 * 60 * 1000;
+const naira = "\u20a6";
+
+const budgets: BudgetDetail[] = [
   {
     id: 1,
-    category: "Food & Dining",
-    spent: 680,
-    budget: 800,
+    category: "Food",
+    name: "Food Budget",
+    spent: 6800,
+    budget: 8000,
     type: "monthly",
-    createdDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
-    color: "#22c55e",
+    icon: Utensils,
+    createdDate: new Date(Date.now() - 8 * dayMs),
   },
   {
     id: 2,
-    category: "Transportation",
-    spent: 320,
-    budget: 400,
+    category: "Transport",
+    name: "Transport Budget",
+    spent: 3200,
+    budget: 5000,
     type: "monthly",
-    createdDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-    color: "#3b82f6",
+    icon: Bus,
+    createdDate: new Date(Date.now() - 10 * dayMs),
   },
   {
     id: 3,
-    category: "Shopping",
-    spent: 450,
-    budget: 350,
-    type: "weekly",
-    createdDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-    color: "#f97316",
+    category: "Data Subscription",
+    name: "Data Subscription Budget",
+    spent: 4500,
+    budget: 4000,
+    type: "monthly",
+    icon: Wifi,
+    createdDate: new Date(Date.now() - 12 * dayMs),
   },
   {
     id: 4,
-    category: "Housing",
-    spent: 2200,
-    budget: 2200,
+    category: "Rent/Hostel",
+    name: "Hostel Budget",
+    spent: 70000,
+    budget: 70000,
     type: "monthly",
-    createdDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
-    color: "#8b5cf6",
+    icon: Home,
+    createdDate: new Date(Date.now() - 18 * dayMs),
   },
   {
     id: 5,
-    category: "Utilities",
-    spent: 180,
-    budget: 250,
+    category: "School Materials",
+    name: "School Materials Budget",
+    spent: 9000,
+    budget: 15000,
     type: "monthly",
-    createdDate: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000),
-    color: "#06b6d4",
+    icon: BookOpen,
+    createdDate: new Date(Date.now() - 15 * dayMs),
   },
   {
     id: 6,
-    category: "Health",
-    spent: 120,
-    budget: 200,
-    type: "yearly",
-    createdDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
-    color: "#ec4899",
+    category: "Personal Care",
+    name: "Personal Care Budget",
+    spent: 5200,
+    budget: 7000,
+    type: "monthly",
+    icon: HeartHandshake,
+    createdDate: new Date(Date.now() - 9 * dayMs),
   },
   {
     id: 7,
     category: "Entertainment",
-    spent: 180,
-    budget: 200,
-    type: "monthly",
-    createdDate: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000),
-    color: "#eab308",
+    name: "Entertainment Budget",
+    spent: 3500,
+    budget: 6000,
+    type: "weekly",
+    icon: Gamepad2,
+    createdDate: new Date(Date.now() - 4 * dayMs),
   },
   {
     id: 8,
-    category: "Travel",
+    category: "Emergency",
+    name: "Emergency Budget",
     spent: 0,
-    budget: 500,
+    budget: 10000,
     type: "custom",
-    startDate: new Date(2025, 2, 1),
-    endDate: new Date(2025, 2, 15),
-    color: "#14b8a6",
+    icon: ShieldCheck,
+    startDate: new Date(2026, 3, 1),
+    endDate: new Date(2026, 3, 30),
   },
 ];
 
-function calculateProjectedSpending(budget: any): {
-  projected: number;
-  status: "on-track" | "warning" | "over";
-  daysElapsed?: number;
-  totalDays?: number;
-} {
-  const today = new Date();
+const relatedTransactions: RelatedTransaction[] = [
+  {
+    id: "txn-001",
+    title: "Cafeteria lunch",
+    category: "Food",
+    date: "2026-04-28",
+    amount: 1200,
+    account: "Cash",
+  },
+  {
+    id: "txn-002",
+    title: "Snacks after lectures",
+    category: "Food",
+    date: "2026-04-27",
+    amount: 800,
+    account: "Opay",
+  },
+  {
+    id: "txn-003",
+    title: "Dinner at hostel gate",
+    category: "Food",
+    date: "2026-04-26",
+    amount: 1500,
+    account: "Bank Account",
+  },
+  {
+    id: "txn-004",
+    title: "Campus shuttle",
+    category: "Transport",
+    date: "2026-04-28",
+    amount: 600,
+    account: "Cash",
+  },
+  {
+    id: "txn-005",
+    title: "Bus fare to town",
+    category: "Transport",
+    date: "2026-04-25",
+    amount: 1100,
+    account: "PalmPay",
+  },
+  {
+    id: "txn-006",
+    title: "Monthly data plan",
+    category: "Data Subscription",
+    date: "2026-04-22",
+    amount: 3500,
+    account: "Kuda",
+  },
+  {
+    id: "txn-007",
+    title: "Project handout printing",
+    category: "School Materials",
+    date: "2026-04-24",
+    amount: 2500,
+    account: "Cash",
+  },
+  {
+    id: "txn-008",
+    title: "Toiletries restock",
+    category: "Personal Care",
+    date: "2026-04-23",
+    amount: 2200,
+    account: "Savings Wallet",
+  },
+  {
+    id: "txn-009",
+    title: "Department hangout",
+    category: "Entertainment",
+    date: "2026-04-26",
+    amount: 3000,
+    account: "Opay",
+  },
+];
 
-  if ((budget.type === "onetime" || budget.type === "custom") && budget.startDate && budget.endDate) {
-    const totalDays = Math.ceil(
-      (budget.endDate.getTime() - budget.startDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    const daysElapsed = Math.ceil(
-      (today.getTime() - budget.startDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
+const periodLabels: Record<BudgetPeriod, string> = {
+  weekly: "Weekly budget",
+  monthly: "Monthly budget",
+  yearly: "Yearly budget",
+  onetime: "One-time budget",
+  custom: "Custom budget",
+};
 
-    if (daysElapsed <= 0) {
-      return { projected: budget.spent, status: "on-track", daysElapsed: 0, totalDays };
-    }
-
-    const dailyRate = budget.spent / Math.max(1, daysElapsed);
-    const projected = dailyRate * totalDays;
-
-    if (projected > budget.budget * 1.1) {
-      return { projected, status: "over", daysElapsed, totalDays };
-    } else if (projected > budget.budget * 0.9) {
-      return { projected, status: "warning", daysElapsed, totalDays };
-    }
-    return { projected, status: "on-track", daysElapsed, totalDays };
-  }
-
-  if (budget.createdDate) {
-    const daysElapsed = Math.ceil(
-      (today.getTime() - budget.createdDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    let totalDays: number;
-    switch (budget.type) {
-      case "weekly":
-        totalDays = 7;
-        break;
-      case "yearly":
-        totalDays = 365;
-        break;
-      case "monthly":
-      default:
-        totalDays = 30;
-        break;
-    }
-
-    if (daysElapsed <= 0) {
-      return { projected: budget.spent, status: "on-track", daysElapsed: 0, totalDays };
-    }
-
-    const dailyRate = budget.spent / Math.max(1, daysElapsed);
-    const projected = dailyRate * totalDays;
-
-    if (projected > budget.budget * 1.1) {
-      return { projected, status: "over", daysElapsed, totalDays };
-    } else if (projected > budget.budget * 0.9) {
-      return { projected, status: "warning", daysElapsed, totalDays };
-    }
-    return { projected, status: "on-track", daysElapsed, totalDays };
-  }
-
-  return { projected: budget.spent, status: "on-track" };
+function formatCurrency(value: number) {
+  return `${naira}${Math.round(value).toLocaleString("en-NG")}`;
 }
 
-function generateTrendData(budget: any) {
-  const data = [];
-  const startDay = Math.max(1, (budget.daysElapsed || 7) - 6);
-
-  for (let i = startDay; i <= (budget.daysElapsed || 7); i++) {
-    data.push({
-      day: `Day ${i}`,
-      actual: Math.floor((budget.spent / (budget.daysElapsed || 1)) * i),
-      projected: Math.floor((budget.projected / (budget.totalDays || 30)) * i),
-    });
-  }
-
-  return data;
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("en-NG", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
-function resolveIcon(iconName?: string) {
-  if (!iconName) {
-    return LucideIcons.Tag;
+function calculateBudgetUsagePercent(spent: number, limit: number) {
+  if (limit <= 0) return 0;
+  return (spent / limit) * 100;
+}
+
+function calculateBudgetStatus(percentageUsed: number): BudgetStatus {
+  if (percentageUsed >= 100) return "over";
+  if (percentageUsed >= 70) return "warning";
+  return "safe";
+}
+
+function calculateRemainingAmount(spent: number, limit: number) {
+  return Math.abs(limit - spent);
+}
+
+function getStatusConfig(status: BudgetStatus) {
+  const configs = {
+    safe: {
+      label: "Safe",
+      risk: "Low Risk",
+      badgeClass:
+        "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20",
+      progressClass: "[&>div]:bg-emerald-500",
+      iconClass: "bg-emerald-500/10 text-emerald-600",
+      panelClass: "border-emerald-500/20 bg-emerald-500/5",
+    },
+    warning: {
+      label: "Warning",
+      risk: "High Risk",
+      badgeClass: "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20",
+      progressClass: "[&>div]:bg-amber-500",
+      iconClass: "bg-amber-500/10 text-amber-600",
+      panelClass: "border-amber-500/20 bg-amber-500/5",
+    },
+    over: {
+      label: "Over Budget",
+      risk: "Over Budget",
+      badgeClass: "bg-rose-500/10 text-rose-700 hover:bg-rose-500/20",
+      progressClass: "[&>div]:bg-rose-500",
+      iconClass: "bg-rose-500/10 text-rose-600",
+      panelClass: "border-rose-500/20 bg-rose-500/5",
+    },
+  };
+
+  return configs[status];
+}
+
+function getPeriodLength(budget: BudgetDetail) {
+  if ((budget.type === "custom" || budget.type === "onetime") && budget.startDate && budget.endDate) {
+    return Math.max(
+      1,
+      Math.ceil((budget.endDate.getTime() - budget.startDate.getTime()) / dayMs)
+    );
   }
 
-  const normalized = iconName
-    .trim()
-    .replace(/[-_ ]+/g, " ")
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join("");
+  if (budget.type === "weekly") return 7;
+  if (budget.type === "yearly") return 365;
+  return 30;
+}
 
-  const icons = LucideIcons as unknown as Record<string, LucideIcon>;
+function getDaysElapsed(budget: BudgetDetail) {
+  const startDate = budget.startDate ?? budget.createdDate ?? new Date();
+  return Math.max(1, Math.ceil((Date.now() - startDate.getTime()) / dayMs));
+}
 
-  return icons[normalized] || LucideIcons.Tag;
+function calculateProjection(budget: BudgetDetail) {
+  const totalDays = getPeriodLength(budget);
+  const daysElapsed = Math.min(getDaysElapsed(budget), totalDays);
+  const averageDailySpend = budget.spent / Math.max(1, daysElapsed);
+  const projectedSpending = averageDailySpend * totalDays;
+  const daysUntilExceeded =
+    budget.spent >= budget.budget
+      ? 0
+      : averageDailySpend > 0
+        ? Math.ceil((budget.budget - budget.spent) / averageDailySpend)
+        : null;
+
+  return {
+    totalDays,
+    daysElapsed,
+    averageDailySpend,
+    projectedSpending,
+    daysUntilExceeded,
+  };
+}
+
+function getRecommendation(
+  budget: BudgetDetail,
+  status: BudgetStatus,
+  projection: ReturnType<typeof calculateProjection>
+) {
+  const reduction = Math.max(100, Math.ceil((budget.spent - budget.budget / 2) / 10) * 10);
+  const remainingDays = Math.max(
+    0,
+    projection.totalDays - projection.daysElapsed
+  );
+
+  if (status === "over") {
+    return `You have exceeded this budget. Pause non-essential ${budget.category.toLowerCase()} spending and review the latest transactions before spending more.`;
+  }
+
+  if (status === "warning") {
+    return `At your current pace, this budget may be exceeded${
+      projection.daysUntilExceeded ? ` in ${projection.daysUntilExceeded} days` : ""
+    }. Try reducing daily spending in this category by about ${formatCurrency(reduction)}.`;
+  }
+
+  if (
+    projection.daysUntilExceeded !== null &&
+    projection.daysUntilExceeded <= remainingDays
+  ) {
+    return `You are still within this budget, but your current pace may exceed it in ${projection.daysUntilExceeded} days. Try spacing out ${budget.category.toLowerCase()} spending this week.`;
+  }
+
+  return `This budget is safe based on your current spending pace. Keep tracking ${budget.category.toLowerCase()} expenses so it stays that way.`;
+}
+
+function BudgetDetailSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <div className="space-y-4">
+        <div className="h-9 w-28 rounded-md bg-muted" />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-3">
+            <div className="h-8 w-56 rounded-md bg-muted" />
+            <div className="h-4 w-72 max-w-full rounded-md bg-muted" />
+            <div className="h-6 w-36 rounded-md bg-muted" />
+          </div>
+          <div className="h-10 w-28 rounded-md bg-muted" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <CardSkeleton count={4} variant="stat" />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="h-5 w-40 rounded-md bg-muted" />
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="h-3 rounded-full bg-muted" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="h-16 rounded-lg bg-muted" />
+            <div className="h-16 rounded-lg bg-muted" />
+            <div className="h-16 rounded-lg bg-muted" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <CardSkeleton count={4} variant="content" />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="h-5 w-44 rounded-md bg-muted" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="h-20 rounded-lg bg-muted" />
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
 export default function BudgetDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const budgetId = parseInt(params.id as string);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [budgets, setBudgets] = useState(allBudgets);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
-  const budget = budgets.find((b) => b.id === budgetId);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
 
-  if (!budget) {
+  const budgetId = Number(params.id);
+  const budget = budgets.find((item) => item.id === budgetId);
+
+  const pageData = useMemo(() => {
+    if (!budget) return null;
+
+    const percentageUsed = calculateBudgetUsagePercent(budget.spent, budget.budget);
+    const status = calculateBudgetStatus(percentageUsed);
+    const statusConfig = getStatusConfig(status);
+    const amountDifference = calculateRemainingAmount(budget.spent, budget.budget);
+    const projection = calculateProjection(budget);
+    const transactions = relatedTransactions.filter(
+      (transaction) => transaction.category === budget.category
+    );
+
+    return {
+      percentageUsed,
+      roundedPercentage: Math.round(percentageUsed),
+      progressValue: Math.min(percentageUsed, 100),
+      status,
+      statusConfig,
+      amountDifference,
+      projection,
+      transactions,
+      recommendation: getRecommendation(
+        budget,
+        status,
+        projection
+      ),
+    };
+  }, [budget]);
+
+  const retry = () => {
+    setHasError(false);
+    setIsLoading(true);
+    window.setTimeout(() => setIsLoading(false), 600);
+  };
+
+  if (isLoading) {
+    return <BudgetDetailSkeleton />;
+  }
+
+  if (hasError) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground">Budget not found</p>
-            <Button onClick={() => router.back()} className="mt-4">
-              Go Back
-            </Button>
-          </CardContent>
-        </Card>
+      <ErrorState
+        title="Failed to load budget"
+        description="Something went wrong while loading this budget. Please try again."
+        onRetry={retry}
+        retryLabel="Retry"
+      />
+    );
+  }
+
+  if (!budget || !pageData) {
+    return (
+      <div className="space-y-6">
+        <Button
+          variant="ghost"
+          className="gap-2 px-0 sm:px-3"
+          onClick={() => router.push("/budgets")}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Budgets
+        </Button>
+        <EmptyState
+          icon={Target}
+          title="Budget not found"
+          description="This budget may have been removed or does not exist."
+          action={{
+            label: "Back to Budgets",
+            onClick: () => router.push("/budgets"),
+          }}
+        />
       </div>
     );
   }
 
-  const percentage = Math.round((budget.spent / budget.budget) * 100);
-  const projectionData = calculateProjectedSpending(budget);
-  const remaining = budget.budget - budget.spent;
-  const dailyAverage = budget.daysElapsed
-    ? budget.spent / budget.daysElapsed
-    : budget.spent / 1;
-
-  const statusConfig = {
-    "on-track": { label: "On Track", color: "bg-success/10 text-success" },
-    warning: { label: "Warning", color: "bg-amber-500/10 text-amber-700" },
-    over: { label: "Over Budget", color: "bg-destructive/10 text-destructive" },
-  };
-
-  const typeLabels = {
-    weekly: "Weekly",
-    monthly: "Monthly",
-    yearly: "Yearly",
-    onetime: "One-Time",
-    custom: "Custom Range",
-  };
-
-  const trendData = generateTrendData({
-    ...projectionData,
-    daysElapsed: projectionData.daysElapsed || 7,
-    totalDays: projectionData.totalDays || 30,
-  });
-
-  const handleDeleteBudget = () => {
-    setBudgets(budgets.filter((b) => b.id !== budgetId));
-    router.push("/budgets");
-  };
+  const Icon = budget.icon;
+  const remainingLabel =
+    budget.spent > budget.budget
+      ? `${formatCurrency(pageData.amountDifference)} over budget`
+      : `${formatCurrency(pageData.amountDifference)} remaining`;
+  const remainingTitle = budget.spent > budget.budget ? "Amount Over" : "Amount Remaining";
+  const projectionRisk =
+    pageData.status === "over"
+      ? "Over Budget"
+      : pageData.projection.projectedSpending >= budget.budget ||
+          pageData.status === "warning"
+        ? "High Risk"
+        : "Low Risk";
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">{budget.category}</h1>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="secondary" className="text-xs">
-                {typeLabels[budget.type as keyof typeof typeLabels]}
+      <div className="space-y-4">
+        <Button
+          variant="ghost"
+          className="gap-2 px-0 sm:px-3"
+          onClick={() => router.push("/budgets")}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Budgets
+        </Button>
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className={cn("rounded-lg p-2.5", pageData.statusConfig.iconClass)}>
+                <Icon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                  {budget.name}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {periodLabels[budget.type]} · {budget.category}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className={cn("text-xs", pageData.statusConfig.badgeClass)}>
+                Status: {pageData.statusConfig.label}
               </Badge>
-              <Badge className={cn("text-xs", statusConfig[projectionData.status].color)}>
-                {statusConfig[projectionData.status].label}
+              <Badge variant="secondary" className="text-xs">
+                {pageData.projection.daysElapsed} of {pageData.projection.totalDays} days used
               </Badge>
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={() => setEditDialogOpen(true)}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="outline" 
-            size="icon" 
-            className="text-destructive hover:text-destructive"
-            onClick={() => setDeleteDialogOpen(true)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground mb-1">Budget</p>
-            <p className="text-2xl font-bold">₦{budget.budget.toLocaleString("en-NG")}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground mb-1">Spent</p>
-            <p className="text-2xl font-bold text-destructive">₦{budget.spent.toLocaleString("en-NG")}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground mb-1">Remaining</p>
-            <p className={cn("text-2xl font-bold", remaining < 0 ? "text-destructive" : "text-success")}>
-              ₦{remaining.toLocaleString("en-NG")}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground mb-1">Projected Total</p>
-            <p className={cn(
-              "text-2xl font-bold",
-              projectionData.projected > budget.budget ? "text-destructive" : "text-success"
-            )}>
-              ₦{projectionData.projected.toLocaleString("en-NG", { maximumFractionDigits: 0 })}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Budget Amount"
+          value={formatCurrency(budget.budget)}
+          change={periodLabels[budget.type]}
+          icon={Target}
+          iconColor="bg-primary/10 text-primary"
+        />
+        <StatCard
+          title="Amount Spent"
+          value={formatCurrency(budget.spent)}
+          change={`${pageData.roundedPercentage}% of budget`}
+          trend={pageData.status === "over" ? "down" : "neutral"}
+          icon={ReceiptText}
+          iconColor="bg-rose-500/10 text-rose-600"
+        />
+        <StatCard
+          title={remainingTitle}
+          value={formatCurrency(pageData.amountDifference)}
+          change={remainingLabel}
+          trend={budget.spent > budget.budget ? "down" : "up"}
+          icon={Wallet}
+          iconColor={pageData.statusConfig.iconClass}
+        />
+        <StatCard
+          title="Percentage Used"
+          value={`${pageData.roundedPercentage}%`}
+          change={pageData.statusConfig.label}
+          trend={pageData.status === "safe" ? "up" : pageData.status === "over" ? "down" : "neutral"}
+          icon={Percent}
+          iconColor={pageData.statusConfig.iconClass}
+        />
       </div>
 
-      {/* Progress */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Progress</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Target className="h-4 w-4" />
+            Budget Progress
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <div className="flex justify-between mb-2 text-sm">
-              <span>Amount Spent</span>
-              <span className="font-medium">{percentage}%</span>
+        <CardContent className="space-y-5">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span className="text-muted-foreground">
+                {formatCurrency(budget.spent)} of {formatCurrency(budget.budget)} used
+              </span>
+              <span className="font-medium">{pageData.roundedPercentage}% used</span>
             </div>
-            <Progress value={Math.min(percentage, 100)} className="h-3" />
+            <Progress
+              value={pageData.progressValue}
+              className={cn("h-3", pageData.statusConfig.progressClass)}
+            />
           </div>
-          <div className="grid grid-cols-2 gap-4 pt-4 text-sm">
-            <div>
-              <p className="text-muted-foreground">Spent</p>
-              <p className="text-lg font-semibold">₦{budget.spent.toLocaleString("en-NG")}</p>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <p className="text-xs font-medium uppercase text-muted-foreground">
+                Spent
+              </p>
+              <p className="mt-1 text-lg font-semibold">{formatCurrency(budget.spent)}</p>
             </div>
-            <div>
-              <p className="text-muted-foreground">Remaining</p>
-              <p className="text-lg font-semibold">₦{remaining.toLocaleString("en-NG")}</p>
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <p className="text-xs font-medium uppercase text-muted-foreground">
+                {budget.spent > budget.budget ? "Over" : "Left"}
+              </p>
+              <p className="mt-1 text-lg font-semibold">
+                {formatCurrency(pageData.amountDifference)}
+              </p>
+            </div>
+            <div className={cn("rounded-lg border p-4", pageData.statusConfig.panelClass)}>
+              <p className="text-xs font-medium uppercase text-muted-foreground">
+                Status
+              </p>
+              <p className="mt-1 text-lg font-semibold">
+                {pageData.statusConfig.label}
+              </p>
             </div>
           </div>
+
+          <p className="text-sm text-muted-foreground">
+            {budget.spent > budget.budget
+              ? `${formatCurrency(pageData.amountDifference)} over budget`
+              : `${formatCurrency(pageData.amountDifference)} remaining`}
+          </p>
         </CardContent>
       </Card>
 
-      {/* Trend Chart */}
-      {trendData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Spending Trend</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
-                <YAxis />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                  formatter={(value: number) => `₦${value.toLocaleString("en-NG")}`}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="actual" stroke="#22c55e" name="Actual Spending" />
-                <Line type="monotone" dataKey="projected" stroke="#f97316" name="Projected" strokeDasharray="5 5" />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">Spending Projection</h2>
+          <p className="text-sm text-muted-foreground">
+            Based on spending so far in this budget period.
+          </p>
+        </div>
 
-      {/* Analysis */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Daily Analysis</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Daily Average Spending</p>
-              <p className="text-2xl font-bold">₦{dailyAverage.toLocaleString("en-NG", { maximumFractionDigits: 0 })}</p>
-            </div>
-            {projectionData.daysElapsed !== undefined && projectionData.totalDays !== undefined && (
-              <div>
-                <p className="text-sm text-muted-foreground">Days Elapsed</p>
-                <p className="text-lg font-semibold">{projectionData.daysElapsed} of {projectionData.totalDays} days</p>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Average Daily Spending
+                  </p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {formatCurrency(pageData.projection.averageDailySpend)}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
+                  <CalendarDays className="h-5 w-5" />
+                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Insights</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {budget.spent === 0 ? (
-                <p className="text-sm text-muted-foreground">No spending data yet</p>
-              ) : (projectionData.daysElapsed || 0) < 2 ? (
-                <p className="text-sm text-muted-foreground">Insufficient data for accurate projections</p>
-              ) : projectionData.status === "over" ? (
-                <div className="flex gap-2">
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0 text-destructive mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-destructive">Over Budget</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      You&apos;ve exceeded your budget by ₦{(projectionData.projected - budget.budget).toLocaleString("en-NG", { maximumFractionDigits: 0 })}
-                    </p>
-                  </div>
+          <Card>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Projected End Spending
+                  </p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {formatCurrency(pageData.projection.projectedSpending)}
+                  </p>
                 </div>
-              ) : projectionData.status === "warning" ? (
-                <div className="flex gap-2">
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-600 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-amber-700">Warning: Likely to Exceed</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      At your current spending rate, you may exceed this budget
-                    </p>
-                  </div>
+                <div className={cn("rounded-lg p-2.5", pageData.statusConfig.iconClass)}>
+                  <AlertTriangle className="h-5 w-5" />
                 </div>
-              ) : (
-                <div className="flex gap-2">
-                  <TrendingUp className="h-4 w-4 flex-shrink-0 text-success mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-success">On Track</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      You&apos;re within budget and on track
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Related Transactions */}
+          <Card>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    May Be Exceeded In
+                  </p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {pageData.projection.daysUntilExceeded === null
+                      ? "Not likely"
+                      : pageData.projection.daysUntilExceeded === 0
+                        ? "Now"
+                        : `${pageData.projection.daysUntilExceeded} days`}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-muted p-2.5 text-muted-foreground">
+                  <Clock className="h-5 w-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Risk Level
+                  </p>
+                  <p className="mt-1 text-2xl font-bold">{projectionRisk}</p>
+                </div>
+                <div className={cn("rounded-lg p-2.5", pageData.statusConfig.iconClass)}>
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Related Transactions</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ReceiptText className="h-4 w-4" />
+            Related Transactions
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {allTransactions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No transactions yet for this budget</p>
+          {pageData.transactions.length === 0 ? (
+            <EmptyState
+              variant="inline"
+              icon={ReceiptText}
+              title="No transactions found for this budget yet."
+              description="Transactions in this category will appear here when they are recorded."
+            />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {allTransactions.slice(0, 5).map((transaction) => {
-                    const Icon = resolveIcon(transaction.categories?.icon);
-                    return (
-                      <TableRow key={transaction.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className={cn("p-2 rounded-lg", transaction.categories?.color)}>
-                              <Icon className="h-4 w-4" />
-                            </div>
-                            <span className="font-medium text-sm">{transaction.description}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-semibold text-destructive">
-                          -₦{transaction.amount.toLocaleString("en-NG")}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {new Date(transaction.date).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-              {allTransactions.length > 5 && (
-                <Button variant="ghost" className="w-full mt-4">
-                  View All Transactions
-                </Button>
-              )}
+            <div className="space-y-3">
+              {pageData.transactions.map((transaction) => (
+                <div
+                  key={transaction.id}
+                  className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className={cn("shrink-0 rounded-lg p-2.5", pageData.statusConfig.iconClass)}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium">{transaction.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {transaction.category} · {formatDate(transaction.date)} · {transaction.account}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-base font-semibold text-destructive sm:text-right">
+                    -{formatCurrency(transaction.amount)}
+                  </p>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Recommendations */}
-      <Card>
+      <Card className={cn("border", pageData.statusConfig.panelClass)}>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-base">
             <Lightbulb className="h-4 w-4" />
-            Recommendations
+            Recommendation
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {percentage >= 100 ? (
-            <div className="p-4 bg-destructive/5 rounded-lg border border-destructive/20">
-              <p className="font-medium text-destructive mb-1">Budget Exceeded</p>
-              <p className="text-sm text-muted-foreground">
-                You&apos;ve exceeded your {budget.category} budget. Consider reducing discretionary spending or reviewing recent transactions to find areas to cut back.
+          <p className="text-sm leading-6 text-muted-foreground">
+            {pageData.recommendation}
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border bg-background/60 p-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">
+                Keep Daily Spend Under
+              </p>
+              <p className="mt-1 font-semibold">
+                {budget.spent >= budget.budget
+                  ? formatCurrency(0)
+                  : formatCurrency(
+                      (budget.budget - budget.spent) /
+                        Math.max(
+                          1,
+                          pageData.projection.totalDays - pageData.projection.daysElapsed
+                        )
+                    )}
               </p>
             </div>
-          ) : percentage >= 80 ? (
-            <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-              <p className="font-medium text-amber-700 mb-1">Approaching Limit</p>
-              <p className="text-sm text-muted-foreground">
-                You&apos;re using {percentage}% of your budget. Be mindful of your spending for the rest of the period.
+            <div className="rounded-lg border bg-background/60 p-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">
+                Best Account To Review
+              </p>
+              <p className="mt-1 font-semibold">
+                {pageData.transactions[0]?.account ?? "No account yet"}
               </p>
             </div>
-          ) : (
-            <div className="p-4 bg-success/5 rounded-lg border border-success/20">
-              <p className="font-medium text-success mb-1">On Track</p>
-              <p className="text-sm text-muted-foreground">
-                You&apos;re managing your {budget.category} budget well. Keep up the good spending habits!
+            <div className="rounded-lg border bg-background/60 p-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">
+                Spending Pace
+              </p>
+              <p className="mt-1 font-semibold">
+                {pageData.status === "safe"
+                  ? "Comfortable"
+                  : pageData.status === "warning"
+                    ? "Close to limit"
+                    : "Needs action"}
               </p>
             </div>
-          )}
-
-          <div className="space-y-3">
-            <p className="text-sm font-medium">Actionable Tips:</p>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex gap-2">
-                <span className="text-primary">•</span>
-                <span>Review your last 5 transactions to identify spending patterns</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="text-primary">•</span>
-                <span>Set up alerts when you reach 75% of your budget limit</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="text-primary">•</span>
-                <span>Compare this period&apos;s spending with previous periods</span>
-              </li>
-            </ul>
           </div>
         </CardContent>
       </Card>
-
-      {/* Edit Budget Dialog */}
-      <BudgetDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        budget={budget}
-      />
-
-      {/* Delete Budget Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Budget</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete the &quot;{budget?.category}&quot; budget? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              variant="destructive"
-              onClick={handleDeleteBudget}
-            >
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
