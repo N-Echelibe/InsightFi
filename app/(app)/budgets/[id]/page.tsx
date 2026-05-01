@@ -18,7 +18,17 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { ArrowLeft, Edit, Trash2, AlertTriangle, TrendingUp } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import * as LucideIcons from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, AlertTriangle, TrendingUp, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BudgetDialog } from "@/components/budgets/budget-dialog";
 import {
@@ -29,6 +39,65 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+
+// Mock transaction data - in real app would come from database
+const allTransactions = [
+  {
+    id: "txn-001",
+    description: "Lunch at restaurant",
+    amount: 5200,
+    date: "2026-04-28",
+    categories: {
+      icon: "utensils",
+      name: "Food & Dining",
+      color: "bg-orange-100 text-orange-700",
+    },
+  },
+  {
+    id: "txn-002",
+    description: "Grocery shopping",
+    amount: 12500,
+    date: "2026-04-27",
+    categories: {
+      icon: "shopping-bag",
+      name: "Food & Dining",
+      color: "bg-orange-100 text-orange-700",
+    },
+  },
+  {
+    id: "txn-003",
+    description: "Coffee break",
+    amount: 1500,
+    date: "2026-04-26",
+    categories: {
+      icon: "coffee",
+      name: "Food & Dining",
+      color: "bg-orange-100 text-orange-700",
+    },
+  },
+  {
+    id: "txn-004",
+    description: "Restaurant dinner",
+    amount: 8400,
+    date: "2026-04-25",
+    categories: {
+      icon: "utensils",
+      name: "Food & Dining",
+      color: "bg-orange-100 text-orange-700",
+    },
+  },
+  {
+    id: "txn-005",
+    description: "Fast food",
+    amount: 3200,
+    date: "2026-04-24",
+    categories: {
+      icon: "utensils",
+      name: "Food & Dining",
+      color: "bg-orange-100 text-orange-700",
+    },
+  },
+];
 
 // Mock budget data - in real app would come from database
 const allBudgets = [
@@ -188,6 +257,23 @@ function generateTrendData(budget: any) {
   }
 
   return data;
+}
+
+function resolveIcon(iconName?: string) {
+  if (!iconName) {
+    return LucideIcons.Tag;
+  }
+
+  const normalized = iconName
+    .trim()
+    .replace(/[-_ ]+/g, " ")
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join("");
+
+  const icons = LucideIcons as unknown as Record<string, LucideIcon>;
+
+  return icons[normalized] || LucideIcons.Tag;
 }
 
 export default function BudgetDetailPage() {
@@ -441,6 +527,113 @@ export default function BudgetDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Related Transactions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Related Transactions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {allTransactions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No transactions yet for this budget</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allTransactions.slice(0, 5).map((transaction) => {
+                    const Icon = resolveIcon(transaction.categories?.icon);
+                    return (
+                      <TableRow key={transaction.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className={cn("p-2 rounded-lg", transaction.categories?.color)}>
+                              <Icon className="h-4 w-4" />
+                            </div>
+                            <span className="font-medium text-sm">{transaction.description}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-destructive">
+                          -₦{transaction.amount.toLocaleString("en-NG")}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(transaction.date).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              {allTransactions.length > 5 && (
+                <Button variant="ghost" className="w-full mt-4">
+                  View All Transactions
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recommendations */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Lightbulb className="h-4 w-4" />
+            Recommendations
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {percentage >= 100 ? (
+            <div className="p-4 bg-destructive/5 rounded-lg border border-destructive/20">
+              <p className="font-medium text-destructive mb-1">Budget Exceeded</p>
+              <p className="text-sm text-muted-foreground">
+                You&apos;ve exceeded your {budget.category} budget. Consider reducing discretionary spending or reviewing recent transactions to find areas to cut back.
+              </p>
+            </div>
+          ) : percentage >= 80 ? (
+            <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+              <p className="font-medium text-amber-700 mb-1">Approaching Limit</p>
+              <p className="text-sm text-muted-foreground">
+                You&apos;re using {percentage}% of your budget. Be mindful of your spending for the rest of the period.
+              </p>
+            </div>
+          ) : (
+            <div className="p-4 bg-success/5 rounded-lg border border-success/20">
+              <p className="font-medium text-success mb-1">On Track</p>
+              <p className="text-sm text-muted-foreground">
+                You&apos;re managing your {budget.category} budget well. Keep up the good spending habits!
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Actionable Tips:</p>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex gap-2">
+                <span className="text-primary">•</span>
+                <span>Review your last 5 transactions to identify spending patterns</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-primary">•</span>
+                <span>Set up alerts when you reach 75% of your budget limit</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-primary">•</span>
+                <span>Compare this period&apos;s spending with previous periods</span>
+              </li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Edit Budget Dialog */}
       <BudgetDialog
