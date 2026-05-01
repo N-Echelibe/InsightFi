@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -35,6 +34,7 @@ import {
 } from "@/components/ui/popover";
 import { format } from "date-fns";
 import * as LucideIcons from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import {
   Plus,
   Search,
@@ -48,11 +48,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddTransactionDialog } from "@/components/transactions/add-transaction-dialog";
+import { EmptyState } from "@/components/states";
 import Loading from "./loading";
-import axios from "axios";
-import api from "@/lib/api";
-import { TableSkeleton } from "@/components/skeletons";
-import { ErrorState, EmptyState } from "@/components/states";
 
 type Transaction = {
   id: string;
@@ -73,7 +70,171 @@ type Transaction = {
   };
 };
 
+const sampleTransactions: Transaction[] = [
+  {
+    id: "txn-001",
+    description: "Salary payment",
+    amount: 850000,
+    type: "income",
+    date: "2026-04-30",
+    status: "completed",
+    categories: {
+      icon: "briefcase",
+      name: "Income",
+      color: "bg-success/10 text-success",
+    },
+    accounts: {
+      name: "GTBank Current",
+    },
+  },
+  {
+    id: "txn-002",
+    description: "Grocery restock",
+    amount: 46250,
+    type: "expense",
+    date: "2026-04-29",
+    status: "completed",
+    categories: {
+      icon: "utensils",
+      name: "Food & Dining",
+      color: "bg-orange-100 text-orange-700",
+    },
+    accounts: {
+      name: "Kuda Savings",
+    },
+  },
+  {
+    id: "txn-003",
+    description: "Ride to client meeting",
+    amount: 7800,
+    type: "expense",
+    date: "2026-04-26",
+    status: "completed",
+    categories: {
+      icon: "car",
+      name: "Transportation",
+      color: "bg-blue-100 text-blue-700",
+    },
+    accounts: {
+      name: "Kuda Savings",
+    },
+  },
+  {
+    id: "txn-004",
+    description: "Apartment rent",
+    amount: 320000,
+    type: "expense",
+    date: "2026-04-22",
+    status: "completed",
+    categories: {
+      icon: "home",
+      name: "Housing",
+      color: "bg-violet-100 text-violet-700",
+    },
+    accounts: {
+      name: "GTBank Current",
+    },
+  },
+  {
+    id: "txn-005",
+    description: "Cloud storage subscription",
+    amount: 12500,
+    type: "expense",
+    date: "2026-04-18",
+    status: "pending",
+    categories: {
+      icon: "refresh-cw",
+      name: "Subscriptions",
+      color: "bg-cyan-100 text-cyan-700",
+    },
+    accounts: {
+      name: "Zenith Debit",
+    },
+  },
+  {
+    id: "txn-006",
+    description: "New work shoes",
+    amount: 58500,
+    type: "expense",
+    date: "2026-04-12",
+    status: "completed",
+    categories: {
+      icon: "shopping-bag",
+      name: "Shopping",
+      color: "bg-pink-100 text-pink-700",
+    },
+    accounts: {
+      name: "Zenith Debit",
+    },
+  },
+  {
+    id: "txn-007",
+    description: "Freelance invoice",
+    amount: 175000,
+    type: "income",
+    date: "2026-03-31",
+    status: "completed",
+    categories: {
+      icon: "wallet",
+      name: "Income",
+      color: "bg-success/10 text-success",
+    },
+    accounts: {
+      name: "GTBank Current",
+    },
+  },
+  {
+    id: "txn-008",
+    description: "Weekend dinner",
+    amount: 31500,
+    type: "expense",
+    date: "2026-03-24",
+    status: "completed",
+    categories: {
+      icon: "utensils",
+      name: "Food & Dining",
+      color: "bg-orange-100 text-orange-700",
+    },
+    accounts: {
+      name: "Kuda Savings",
+    },
+  },
+  {
+    id: "txn-009",
+    description: "Internet bill",
+    amount: 28000,
+    type: "expense",
+    date: "2026-02-28",
+    status: "completed",
+    categories: {
+      icon: "wifi",
+      name: "Subscriptions",
+      color: "bg-cyan-100 text-cyan-700",
+    },
+    accounts: {
+      name: "Zenith Debit",
+    },
+  },
+  {
+    id: "txn-010",
+    description: "Airport transfer",
+    amount: 22500,
+    type: "expense",
+    date: "2026-01-16",
+    status: "completed",
+    categories: {
+      icon: "car",
+      name: "Transportation",
+      color: "bg-blue-100 text-blue-700",
+    },
+    accounts: {
+      name: "Kuda Savings",
+    },
+  },
+];
+
 export default function TransactionsPage() {
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
@@ -81,10 +242,15 @@ export default function TransactionsPage() {
   const [customDateEnd, setCustomDateEnd] = useState<Date | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [transactionsData, setTransactionsData] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const itemsPerPage = 8;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const resolveIcon = (iconName?: string) => {
     if (!iconName) {
@@ -98,33 +264,15 @@ export default function TransactionsPage() {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join("");
 
-    // direct oj; if not found fallback to Tag
-    return (LucideIcons as any)[normalized] || LucideIcons.Tag;
+    const icons = LucideIcons as unknown as Record<string, LucideIcon>;
+
+    return icons[normalized] || LucideIcons.Tag;
   };
 
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 15,
-    total: 0,
-    pages: 1,
-  });
+  const filteredTransactions = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
 
-  const fetchTransactions = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams();
-      params.set("page", `${currentPage}`);
-
-      if (categoryFilter !== "all") {
-        params.set("category", categoryFilter);
-      }
-
-      if (searchQuery.trim()) {
-        params.set("search", searchQuery.trim());
-      }
-
+    const getDateRange = () => {
       const now = new Date();
       let startDate: Date | null = null;
       let endDate: Date | null = null;
@@ -146,79 +294,68 @@ export default function TransactionsPage() {
         endDate = customDateEnd;
       }
 
-      if (startDate) {
-        params.set("startDate", startDate.toISOString());
-      }
       if (endDate) {
-        const endDateCopy = new Date(endDate);
-        endDateCopy.setHours(23, 59, 59, 999);
-        params.set("endDate", endDateCopy.toISOString());
+        endDate = new Date(endDate);
+        endDate.setHours(23, 59, 59, 999);
       }
 
-      const response = await axios.get(`${api.baseURL}/transactions?${params.toString()}`);
-      const payload = response.data;
+      return { startDate, endDate };
+    };
 
-      if (payload && Array.isArray(payload.transactions)) {
-        setTransactionsData(payload.transactions);
-        setPagination({
-          page: payload.pagination?.page ?? 1,
-          limit: payload.pagination?.limit ?? 8,
-          total: payload.pagination?.total ?? payload.transactions.length,
-          pages: payload.pagination?.pages ?? 1,
-        });
-        setCurrentPage(payload.pagination?.page ?? 1);
-      } else {
-        setTransactionsData([]);
-        setPagination({ page: 1, limit: itemsPerPage, total: 0, pages: 1 });
-        setError("Unexpected transactions payload");
-      }
-    } catch (err) {
-      console.error("Failed to fetch transactions", err);
-      setTransactionsData([]);
-      setPagination({ page: 1, limit: itemsPerPage, total: 0, pages: 1 });
-      setError("Failed to load transactions");
-    } finally {
-      setIsLoading(false);
-    }
+    const { startDate, endDate } = getDateRange();
+
+    return sampleTransactions.filter((transaction) => {
+      const categoryName = transaction.categories?.name ?? "";
+      const accountName = transaction.accounts?.name ?? "";
+      const transactionDate = new Date(transaction.date);
+      const matchesSearch =
+        !query ||
+        transaction.description.toLowerCase().includes(query) ||
+        categoryName.toLowerCase().includes(query) ||
+        accountName.toLowerCase().includes(query) ||
+        transaction.status.toLowerCase().includes(query);
+      const matchesCategory =
+        categoryFilter === "all" || categoryName === categoryFilter;
+      const matchesStartDate = !startDate || transactionDate >= startDate;
+      const matchesEndDate = !endDate || transactionDate <= endDate;
+
+      return (
+        matchesSearch &&
+        matchesCategory &&
+        matchesStartDate &&
+        matchesEndDate
+      );
+    });
+  }, [
+    categoryFilter,
+    customDateEnd,
+    customDateStart,
+    dateFilter,
+    searchQuery,
+  ]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredTransactions.length / itemsPerPage)
+  );
+  const pagination = {
+    page: currentPage,
+    limit: itemsPerPage,
+    total: filteredTransactions.length,
+    pages: totalPages,
   };
-
-  useEffect(() => {
-    fetchTransactions();
-  }, [searchQuery, categoryFilter, dateFilter, customDateStart, customDateEnd, currentPage]);
-
-  const filteredTransactions = transactionsData;
-  const paginatedTransactions = filteredTransactions;
-  const totalPages = pagination.pages;
   const startIdx = (pagination.page - 1) * pagination.limit;
+  const paginatedTransactions = filteredTransactions.slice(
+    startIdx,
+    startIdx + pagination.limit
+  );
 
   const handlePageChange = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Loading />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
-          <p className="text-muted-foreground">
-            Manage and track all your transactions
-          </p>
-        </div>
-        <ErrorState
-          title="Failed to load transactions"
-          description={error}
-          onRetry={() => fetchTransactions()}
-        />
-      </div>
-    );
+    return <Loading />;
   }
 
   return (
@@ -232,7 +369,10 @@ export default function TransactionsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button className="gap-2" onClick={() => setAddDialogOpen(true)}>
+          <Button
+            className="w-full gap-2 sm:w-auto"
+            onClick={() => setAddDialogOpen(true)}
+          >
             <Plus className="h-4 w-4" />
             Add Transaction
           </Button>
@@ -374,21 +514,7 @@ export default function TransactionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12">
-                      <div className="space-y-3">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <div key={i} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg animate-pulse">
-                            <div className="h-8 w-8 rounded bg-muted" />
-                            <div className="h-4 flex-1 bg-muted rounded" />
-                            <div className="h-4 w-20 bg-muted rounded" />
-                          </div>
-                        ))}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : paginatedTransactions.length === 0 ? (
+                {paginatedTransactions.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7}>
                       <EmptyState

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
-import { CardSkeleton } from "@/components/skeletons";
 import { ErrorState } from "@/components/states";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -107,14 +106,64 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6 animate-pulse">
         <div>
-          <div className="h-8 w-1/4 rounded-md bg-muted" />
-          <div className="mt-2 h-4 w-1/3 rounded-md bg-muted" />
+          <div className="h-8 w-36 rounded-md bg-muted" />
+          <div className="mt-2 h-4 w-80 rounded-md bg-muted" />
         </div>
-        <div className="space-y-4">
-          <CardSkeleton count={3} variant="content" />
+
+        <div className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted p-1 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="h-9 rounded-sm bg-background/60" />
+          ))}
         </div>
+
+        <Card>
+          <CardHeader>
+            <div className="h-6 w-44 rounded-md bg-muted" />
+            <div className="mt-2 h-4 w-72 rounded-md bg-muted" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center gap-6">
+              <div className="h-20 w-20 rounded-full bg-muted" />
+              <div className="space-y-2">
+                <div className="h-9 w-32 rounded-md bg-muted" />
+                <div className="h-3 w-44 rounded-md bg-muted" />
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="h-4 w-24 rounded-md bg-muted" />
+                  <div className="h-10 rounded-md bg-muted" />
+                </div>
+              ))}
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-4">
+              <div className="h-5 w-28 rounded-md bg-muted" />
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <div className="h-4 w-20 rounded-md bg-muted" />
+                  <div className="h-10 rounded-md bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <div className="h-4 w-24 rounded-md bg-muted" />
+                  <div className="h-10 rounded-md bg-muted" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <div className="h-10 w-32 rounded-md bg-muted" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

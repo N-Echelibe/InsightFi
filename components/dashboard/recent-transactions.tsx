@@ -80,20 +80,20 @@ export function RecentTransactions() {
           {transactions.map((transaction) => (
             <div
               key={transaction.id}
-              className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className={cn("p-2 rounded-lg", transaction.color)}>
+            className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+          >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className={cn("shrink-0 p-2 rounded-lg", transaction.color)}>
                   <transaction.icon className="h-4 w-4" />
                 </div>
-                <div>
-                  <p className="text-sm font-medium">{transaction.name}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{transaction.name}</p>
                   <p className="text-xs text-muted-foreground">
                     {transaction.category}
                   </p>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="shrink-0 text-right">
                 <p
                   className={cn(
                     "text-sm font-semibold",
