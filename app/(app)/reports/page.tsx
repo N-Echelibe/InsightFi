@@ -1,12 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { StatCard } from "@/components/dashboard/stat-card";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CardSkeleton } from "@/components/skeletons";
-import { ErrorState } from "@/components/states";
 
 import {
   Select,
@@ -119,16 +116,6 @@ const reportTypes = [
 export default function ReportsPage() {
   const [dateRange, setDateRange] = useState("12m");
   const [reportType, setReportType] = useState("spending");
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, []);
 
   const totalIncome = monthlyData.reduce((sum, m) => sum + m.income, 0);
   const totalExpenses = monthlyData.reduce((sum, m) => sum + m.expenses, 0);
@@ -140,112 +127,6 @@ export default function ReportsPage() {
     console.log(`Exporting report as ${format}`);
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6 animate-pulse">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="h-8 w-36 rounded-md bg-muted" />
-            <div className="mt-2 h-4 w-80 rounded-md bg-muted" />
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-10 w-[140px] rounded-md bg-muted" />
-            <div className="h-10 w-20 rounded-md bg-muted" />
-            <div className="h-10 w-20 rounded-md bg-muted" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <CardSkeleton count={4} variant="stat" />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <Card key={index}>
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className="h-9 w-9 rounded-lg bg-muted" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 w-28 rounded-md bg-muted" />
-                    <div className="h-3 w-full rounded-md bg-muted" />
-                    <div className="h-3 w-3/4 rounded-md bg-muted" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div className="h-6 w-52 rounded-md bg-muted" />
-              <div className="h-9 w-20 rounded-md bg-muted" />
-            </CardHeader>
-            <CardContent>
-              <div className="h-[350px] rounded-md bg-muted" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="h-6 w-40 rounded-md bg-muted" />
-            </CardHeader>
-            <CardContent>
-              <div className="h-[200px] rounded-md bg-muted" />
-              <div className="mt-4 space-y-3">
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-muted" />
-                      <div className="h-4 w-24 rounded-md bg-muted" />
-                    </div>
-                    <div className="h-4 w-12 rounded-md bg-muted" />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <div className="h-6 w-40 rounded-md bg-muted" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="h-10 rounded-md bg-muted" />
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="h-12 rounded-md bg-muted" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (hasError) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
-          <p className="text-muted-foreground">
-            Analyze your financial data with detailed reports
-          </p>
-        </div>
-        <ErrorState
-          title="Failed to load reports"
-          description="We couldn&apos;t load your reports. Please try again."
-          onRetry={() => {
-            setHasError(false);
-            setIsLoading(true);
-          }}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -256,9 +137,9 @@ export default function ReportsPage() {
             Analyze your financial data with detailed reports
           </p>
         </div>
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+        <div className="flex items-center gap-2">
           <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-full sm:w-[140px]">
+            <SelectTrigger className="w-[140px]">
               <CalendarIcon className="h-4 w-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
@@ -270,61 +151,108 @@ export default function ReportsPage() {
               <SelectItem value="ytd">Year to Date</SelectItem>
             </SelectContent>
           </Select>
-          <Button
-            variant="outline"
-            className="min-w-0 flex-1 gap-2 bg-transparent sm:flex-none"
-            onClick={() => handleExport("csv")}
-          >
+          <Button variant="outline" className="gap-2 bg-transparent" onClick={() => handleExport("csv")}>
             <FileSpreadsheet className="h-4 w-4" />
             CSV
           </Button>
-          <Button
-            className="min-w-0 flex-1 gap-2 sm:flex-none"
-            onClick={() => handleExport("pdf")}
-          >
+          <Button className="gap-2" onClick={() => handleExport("pdf")}>
             <Download className="h-4 w-4" />
             PDF
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <StatCard
-          title="Total Income"
-          value={`$${totalIncome.toLocaleString()}`}
-          change="+12% vs last year"
-          trend="up"
-          icon={DollarSign}
-          iconColor="bg-success/10 text-success"
-        />
-        <StatCard
-          title="Total Expenses"
-          value={`$${totalExpenses.toLocaleString()}`}
-          change="+8% vs last year"
-          trend="down"
-          icon={TrendingDown}
-          iconColor="bg-destructive/10 text-destructive"
-        />
-        <StatCard
-          title="Total Savings"
-          value={`$${totalSavings.toLocaleString()}`}
-          change="+18% vs last year"
-          trend="up"
-          icon={TrendingUp}
-          iconColor="bg-primary/10 text-primary"
-        />
-        <StatCard
-          title="Savings Rate"
-          value={`${savingsRate}%`}
-          change="+3% vs last year"
-          trend="up"
-          icon={PieChartIcon}
-          iconColor="bg-chart-4/10 text-chart-4"
-        />
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Income
+                </p>
+                <p className="text-2xl font-bold">
+                  ${totalIncome.toLocaleString()}
+                </p>
+                <p className="text-xs text-success flex items-center gap-1 mt-1">
+                  <TrendingUp className="h-3 w-3" />
+                  +12% vs last year
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-success/10 text-success">
+                <DollarSign className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Expenses
+                </p>
+                <p className="text-2xl font-bold">
+                  ${totalExpenses.toLocaleString()}
+                </p>
+                <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                  <TrendingUp className="h-3 w-3" />
+                  +8% vs last year
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-destructive/10 text-destructive">
+                <TrendingDown className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Savings
+                </p>
+                <p className="text-2xl font-bold">
+                  ${totalSavings.toLocaleString()}
+                </p>
+                <p className="text-xs text-success flex items-center gap-1 mt-1">
+                  <TrendingUp className="h-3 w-3" />
+                  +18% vs last year
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Savings Rate
+                </p>
+                <p className="text-2xl font-bold">{savingsRate}%</p>
+                <p className="text-xs text-success flex items-center gap-1 mt-1">
+                  <TrendingUp className="h-3 w-3" />
+                  +3% vs last year
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-chart-4/10 text-chart-4">
+                <PieChartIcon className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Report Type Selection */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {reportTypes.map((report) => (
           <Card
             key={report.id}

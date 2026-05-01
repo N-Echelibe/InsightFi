@@ -21,15 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Bell, CalendarIcon } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { Bell } from "lucide-react";
 
 interface Budget {
   id: number;
@@ -37,10 +29,6 @@ interface Budget {
   spent: number;
   budget: number;
   alerts: boolean;
-  type?: "weekly" | "monthly" | "yearly" | "onetime" | "custom";
-  startDate?: Date;
-  endDate?: Date;
-  createdDate?: Date;
 }
 
 interface BudgetDialogProps {
@@ -54,26 +42,17 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
   const [amount, setAmount] = useState("");
   const [alertEnabled, setAlertEnabled] = useState(true);
   const [alertThreshold, setAlertThreshold] = useState([80]);
-  const [budgetType, setBudgetType] = useState<"weekly" | "monthly" | "yearly" | "onetime" | "custom">("monthly");
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
 
   useEffect(() => {
     if (budget) {
       setCategory(budget.category);
       setAmount(budget.budget.toString());
       setAlertEnabled(budget.alerts);
-      setBudgetType(budget.type || "monthly");
-      setStartDate(budget.startDate || null);
-      setEndDate(budget.endDate || null);
     } else {
       setCategory("");
       setAmount("");
       setAlertEnabled(true);
       setAlertThreshold([80]);
-      setBudgetType("monthly");
-      setStartDate(null);
-      setEndDate(null);
     }
   }, [budget]);
 
@@ -83,7 +62,7 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{budget ? "Edit Budget" : "Create Budget"}</DialogTitle>
           <DialogDescription>
@@ -116,31 +95,10 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
           </div>
 
           <div className="grid gap-2">
-            <Label>Budget Type</Label>
-            <Select value={budgetType} onValueChange={(value: any) => setBudgetType(value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="weekly">Weekly Recurring</SelectItem>
-                <SelectItem value="monthly">Monthly Recurring</SelectItem>
-                <SelectItem value="yearly">Yearly Recurring</SelectItem>
-                <SelectItem value="onetime">One-Time</SelectItem>
-                <SelectItem value="custom">Custom Range</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="amount">
-              {budgetType === "weekly" && "Weekly Budget"}
-              {budgetType === "monthly" && "Monthly Budget"}
-              {budgetType === "yearly" && "Yearly Budget"}
-              {(budgetType === "onetime" || budgetType === "custom") && "Total Budget"}
-            </Label>
+            <Label htmlFor="amount">Monthly Budget</Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                ₦
+                $
               </span>
               <Input
                 id="amount"
@@ -152,62 +110,6 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
               />
             </div>
           </div>
-
-          {(budgetType === "onetime" || budgetType === "custom") && (
-            <>
-              <div className="grid gap-2">
-                <Label>Start Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "justify-start text-left font-normal",
-                        !startDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate ? format(startDate, "PPP") : "Select date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={startDate || undefined}
-                      onSelect={setStartDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>End Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "justify-start text-left font-normal",
-                        !endDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {endDate ? format(endDate, "PPP") : "Select date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={endDate || undefined}
-                      onSelect={setEndDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </>
-          )}
 
           <div className="space-y-4 pt-2">
             <div className="flex items-center justify-between">
@@ -247,7 +149,7 @@ export function BudgetDialog({ open, onOpenChange, budget }: BudgetDialogProps) 
           </div>
         </div>
 
-        <DialogFooter className="sm:[&>button]:w-auto [&>button]:w-full">
+        <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
