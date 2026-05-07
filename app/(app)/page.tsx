@@ -19,7 +19,7 @@ import {
   TrendingUp,
   TrendingDown,
   PiggyBank,
-  ArrowUpRight,
+  Plus,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -27,8 +27,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { CardSkeleton } from "@/components/skeletons";
 import { ErrorState } from "@/components/states";
+import { AddTransactionDialog } from "@/components/transactions/add-transaction-dialog";
 import api from "@/lib/api";
 import { supabase } from "@/lib/supabase";
+import {
+  createAccountTransfer,
+  type AccountTransferInput,
+} from "@/lib/account-transfer";
 import {
   calculatePercentChange,
   formatPercentChange,
@@ -61,6 +66,14 @@ type SavingsGoal = {
   color?: string;
   autoSave?: boolean;
 };
+
+type CategoryRecord = {
+  id: string;
+  name: string;
+  type?: string;
+};
+
+type DialogMode = "transaction" | "transfer";
 
 const formatCurrency = (value: number) =>
   `${"\u20a6"}${value.toLocaleString("en-NG", {
@@ -216,6 +229,7 @@ export default function DashboardPage() {
     savingsRate: 0,
   });
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<CategoryRecord[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [cashflow, setCashflow] = useState<any[]>([]);
   const [budgets, setBudgets] = useState<any[]>([]);
@@ -223,6 +237,9 @@ export default function DashboardPage() {
   const [firstName, setFirstName] = useState("");
   const [dashboardInsights, setDashboardInsights] =
     useState<DashboardInsights>(emptyInsights);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addDialogMode, setAddDialogMode] = useState<DialogMode>("transaction");
+  const [reloadTick, setReloadTick] = useState(0);
   const [trendComparison, setTrendComparison] = useState<TrendComparison>({
     incomeChange: null,
     expensesChange: null,
@@ -244,6 +261,7 @@ export default function DashboardPage() {
           summaryResponse,
           accountsResponse,
           recentResponse,
+          categoriesResponse,
           cashflowResponse,
           budgetsResponse,
           savingsBucketsResponse,
@@ -254,6 +272,7 @@ export default function DashboardPage() {
           api.get<DashboardSummary>("/dashboard/summary"),
           api.get<{ accounts: any[]; data?: any[] }>("/accounts"),
           api.get<{ transactions: any[] }>("/dashboard/recent-transactions"),
+          api.get<{ categories: CategoryRecord[] }>("/categories"),
           api.get<{ cashflow: any[] }>("/dashboard/cashflow", {
             query: { period: "12m" },
           }),
@@ -290,6 +309,7 @@ export default function DashboardPage() {
 
         setSummary(summaryResponse);
         setAccounts(accountsResponse.accounts ?? accountsResponse.data ?? []);
+        setCategories(categoriesResponse.categories ?? []);
         setRecentTransactions(recentResponse.transactions);
         setCashflow(cashflowResponse.cashflow);
         setBudgets(budgetsResponse.budgets ?? budgetsResponse.data ?? []);
@@ -344,7 +364,33 @@ export default function DashboardPage() {
     };
 
     loadDashboard();
-  }, []);
+  }, [reloadTick]);
+
+  const refreshDashboard = () => {
+    setReloadTick((value) => value + 1);
+  };
+
+  const openAddDialog = (mode: DialogMode) => {
+    setAddDialogMode(mode);
+    setAddDialogOpen(true);
+  };
+
+  const handleCreateTransaction = async (transaction: {
+    account_id: string;
+    amount: number;
+    type: "expense" | "income";
+    category_id: string;
+    description: string;
+    date: string;
+  }) => {
+    await api.post("/transactions", transaction);
+    refreshDashboard();
+  };
+
+  const handleCreateTransfer = async (transfer: AccountTransferInput) => {
+    await createAccountTransfer(transfer);
+    refreshDashboard();
+  };
 
   if (isLoading) {
     return (
@@ -479,7 +525,7 @@ export default function DashboardPage() {
         description="We couldn't load your financial overview. Please try again."
         onRetry={() => {
           setHasError(false);
-          setIsLoading(true);
+          refreshDashboard();
         }}
       />
     );
@@ -497,9 +543,12 @@ export default function DashboardPage() {
             {"Here's your financial overview for today"}
           </p>
         </div>
-        <Button className="w-full gap-2 sm:w-auto">
-          <ArrowUpRight className="h-4 w-4" />
-          Quick Transfer
+        <Button
+          className="w-full gap-2 sm:w-auto"
+          onClick={() => openAddDialog("transaction")}
+        >
+          <Plus className="h-4 w-4" />
+          Add Transaction
         </Button>
       </div>
 
@@ -597,6 +646,15 @@ export default function DashboardPage() {
           <CashRunwayAlertCard metrics={dashboardInsights.metrics} />
         </div>
       </div>
+      <AddTransactionDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        accounts={accounts}
+        categories={categories}
+        defaultMode={addDialogMode}
+        onSubmit={handleCreateTransaction}
+        onTransferSubmit={handleCreateTransfer}
+      />
     </div>
   );
 }

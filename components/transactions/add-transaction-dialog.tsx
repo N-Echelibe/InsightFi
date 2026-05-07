@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,19 +27,31 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { CalendarIcon, Minus, Plus } from "lucide-react";
+import { ArrowRightLeft } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+
+type DialogMode = "transaction" | "transfer";
 
 interface AddTransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  accounts: Array<{ id: string; name: string }>;
+  accounts: Array<{ id: string | number; name: string; currency?: string }>;
   categories: Array<{ id: string; name: string; type?: string }>;
+  defaultMode?: DialogMode;
+  showModeToggle?: boolean;
   onSubmit: (transaction: {
     account_id: string;
     amount: number;
     type: "expense" | "income";
     category_id: string;
+    description: string;
+    date: string;
+  }) => Promise<void>;
+  onTransferSubmit?: (transfer: {
+    from_account_id: string;
+    to_account_id: string;
+    amount: number;
     description: string;
     date: string;
   }) => Promise<void>;
@@ -50,64 +62,162 @@ export function AddTransactionDialog({
   onOpenChange,
   accounts,
   categories,
+  defaultMode = "transaction",
+  showModeToggle = true,
   onSubmit,
+  onTransferSubmit,
 }: AddTransactionDialogProps) {
+  const [mode, setMode] = useState<DialogMode>(defaultMode);
   const [type, setType] = useState<"expense" | "income">("expense");
   const [date, setDate] = useState<Date>(new Date());
   const [amount, setAmount] = useState("");
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [account, setAccount] = useState("");
+  const [transferFrom, setTransferFrom] = useState("");
+  const [transferTo, setTransferTo] = useState("");
 
   const [isSaving, setIsSaving] = useState(false);
 
+  const selectedTransferSource = useMemo(
+    () => accounts.find((item) => String(item.id) === transferFrom),
+    [accounts, transferFrom],
+  );
+
+  const transferToOptions = useMemo(
+    () =>
+      accounts.filter(
+        (item) =>
+          String(item.id) !== transferFrom &&
+          (!selectedTransferSource ||
+            (item.currency ?? "NGN") ===
+              (selectedTransferSource.currency ?? "NGN")),
+      ),
+    [accounts, selectedTransferSource, transferFrom],
+  );
+
+  const resetFields = () => {
+    setDate(new Date());
+    setAmount("");
+    setName("");
+    setCategory("");
+    setAccount("");
+    setTransferFrom("");
+    setTransferTo("");
+    setType("expense");
+  };
+
+  useEffect(() => {
+    if (open) {
+      setMode(defaultMode);
+    }
+  }, [defaultMode, open]);
+
+  useEffect(() => {
+    if (
+      transferTo &&
+      !transferToOptions.some((item) => String(item.id) === transferTo)
+    ) {
+      setTransferTo("");
+    }
+  }, [transferTo, transferToOptions]);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      resetFields();
+    }
+
+    onOpenChange(nextOpen);
+  };
+
   const handleSubmit = async () => {
-    if (!amount || !name.trim() || !category || !account) {
+    const parsedAmount = Number(amount);
+
+    if (Number.isNaN(parsedAmount) || parsedAmount <= 0 || !name.trim()) {
       return;
     }
 
     try {
       setIsSaving(true);
+      if (mode === "transfer") {
+        if (!onTransferSubmit || !transferFrom || !transferTo) {
+          return;
+        }
+
+        await onTransferSubmit({
+          from_account_id: transferFrom,
+          to_account_id: transferTo,
+          amount: parsedAmount,
+          description: name.trim(),
+          date: date.toISOString(),
+        });
+        handleOpenChange(false);
+        resetFields();
+        return;
+      }
+
+      if (!category || !account) {
+        return;
+      }
+
       await onSubmit({
         account_id: account,
-        amount: Number(amount),
+        amount: parsedAmount,
         type,
         category_id: category,
         description: name.trim(),
         date: date.toISOString(),
       });
-      onOpenChange(false);
-      setAmount("");
-      setName("");
-      setCategory("");
-      setAccount("");
+      handleOpenChange(false);
+      resetFields();
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Transaction</DialogTitle>
+          <DialogTitle>
+            {mode === "transfer" ? "Transfer Between Accounts" : "Add Transaction"}
+          </DialogTitle>
           <DialogDescription>
-            Enter the details for your new transaction.
+            {mode === "transfer"
+              ? "Move money from one account to another."
+              : "Enter the details for your new transaction."}
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={type} onValueChange={(v) => setType(v as "expense" | "income")}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="expense" className="gap-2">
-              <Minus className="h-4 w-4" />
-              Expense
-            </TabsTrigger>
-            <TabsTrigger value="income" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Income
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {onTransferSubmit && showModeToggle && (
+          <Tabs value={mode} onValueChange={(v) => setMode(v as DialogMode)}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="transaction">Transaction</TabsTrigger>
+              <TabsTrigger value="transfer" className="gap-2">
+                <ArrowRightLeft className="h-4 w-4" />
+                Transfer
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+
+        {mode === "transaction" && (
+          <Tabs
+            value={type}
+            onValueChange={(v) => setType(v as "expense" | "income")}
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="expense" className="gap-2">
+                <Minus className="h-4 w-4" />
+                Expense
+              </TabsTrigger>
+              <TabsTrigger value="income" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Income
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
 
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
@@ -131,45 +241,89 @@ export function AddTransactionDialog({
             <Label htmlFor="name">Description</Label>
             <Input
               id="name"
-              placeholder="e.g., Grocery shopping"
+              placeholder={
+                mode === "transfer" ? "e.g., Savings transfer" : "e.g., Grocery shopping"
+              }
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
 
-          <div className="grid gap-2">
-            <Label>Category</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories
-                  .filter((item) => !item.type || item.type === type)
-                  .map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {mode === "transaction" ? (
+            <>
+              <div className="grid gap-2">
+                <Label>Category</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories
+                      .filter((item) => !item.type || item.type === type)
+                      .map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="grid gap-2">
-            <Label>Account</Label>
-            <Select value={account} onValueChange={setAccount}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select account" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="grid gap-2">
+                <Label>Account</Label>
+                <Select value={account} onValueChange={setAccount}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((item) => (
+                      <SelectItem key={item.id} value={String(item.id)}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid gap-2">
+                <Label>From Account</Label>
+                <Select value={transferFrom} onValueChange={setTransferFrom}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select source account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((item) => (
+                      <SelectItem key={item.id} value={String(item.id)}>
+                        {item.name} ({item.currency ?? "NGN"})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>To Account</Label>
+                <Select
+                  value={transferTo}
+                  onValueChange={setTransferTo}
+                  disabled={!transferFrom}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select destination account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {transferToOptions.map((item) => (
+                      <SelectItem key={item.id} value={String(item.id)}>
+                        {item.name} ({item.currency ?? "NGN"})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
 
           <div className="grid gap-2">
             <Label>Date</Label>
@@ -199,11 +353,17 @@ export function AddTransactionDialog({
         </div>
 
         <DialogFooter className="sm:[&>button]:w-auto [&>button]:w-full">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={isSaving}>
-            {isSaving ? "Adding..." : "Add Transaction"}
+            {isSaving
+              ? mode === "transfer"
+                ? "Transferring..."
+                : "Adding..."
+              : mode === "transfer"
+                ? "Transfer"
+                : "Add Transaction"}
           </Button>
         </DialogFooter>
       </DialogContent>

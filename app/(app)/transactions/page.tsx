@@ -50,6 +50,10 @@ import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import axios from "axios";
 import { supabase } from "@/lib/supabase";
+import {
+  createAccountTransfer,
+  type AccountTransferInput,
+} from "@/lib/account-transfer";
 import { AddTransactionDialog } from "@/components/transactions/add-transaction-dialog";
 import { EmptyState, ErrorState } from "@/components/states";
 import Loading from "./loading";
@@ -76,6 +80,7 @@ type Transaction = {
 type Account = {
   id: string;
   name: string;
+  currency?: string;
 };
 
 type Category = {
@@ -384,6 +389,11 @@ export default function TransactionsPage() {
     date: string;
   }) => {
     await api.post("/transactions", transaction);
+    refreshCurrentPage();
+  };
+
+  const handleCreateTransfer = async (transfer: AccountTransferInput) => {
+    await createAccountTransfer(transfer);
     refreshCurrentPage();
   };
 
@@ -736,6 +746,7 @@ export default function TransactionsPage() {
         accounts={accounts}
         categories={categories}
         onSubmit={handleCreateTransaction}
+        onTransferSubmit={handleCreateTransfer}
       />
     </div>
   );

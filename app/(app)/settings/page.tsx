@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ErrorState } from "@/components/states";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { EmptyState, ErrorState } from "@/components/states";
 import {
   Card,
   CardContent,
@@ -25,24 +25,30 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
+  ArrowRightLeft,
   Bell,
   BellRing,
   Briefcase,
   Bus,
   Camera,
   Car,
+  CalendarDays,
   Check,
   CreditCard,
+  Database,
   Download,
   Gamepad2,
   GraduationCap,
   Heart,
   Home,
+  KeyRound,
   Laptop,
   Plus,
   Receipt,
   Shield,
   ShoppingBag,
+  SlidersHorizontal,
+  Smartphone,
   Tag,
   Trash2,
   User,
@@ -56,6 +62,11 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { supabase } from "@/lib/supabase";
+import { AddTransactionDialog } from "@/components/transactions/add-transaction-dialog";
+import {
+  createAccountTransfer,
+  type AccountTransferInput,
+} from "@/lib/account-transfer";
 
 type Account = {
   id: string | number;
@@ -260,6 +271,118 @@ const getRecommendedCategoryOption = (name: string, type: string) => {
   );
 };
 
+const formatAccountBalance = (value?: number | string, currency = "NGN") => {
+  const amount = Number(value ?? 0);
+
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(amount) ? amount : 0);
+};
+
+function SectionHeader({
+  icon: Icon,
+  title,
+  description,
+  action,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <CardTitle className="text-lg">{title}</CardTitle>
+          <CardDescription className="mt-1">{description}</CardDescription>
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function SettingsPanel({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("rounded-lg border bg-muted/20 p-4", className)}>
+      {children}
+    </div>
+  );
+}
+
+function StatusMessage({
+  message,
+}: {
+  message: { type: "success" | "error"; text: string } | null;
+}) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <div
+      className={cn(
+        "rounded-md border px-3 py-2 text-sm",
+        message.type === "success"
+          ? "border-success/20 bg-success/10 text-success"
+          : "border-destructive/20 bg-destructive/10 text-destructive",
+      )}
+    >
+      {message.text}
+    </div>
+  );
+}
+
+function ToggleRow({
+  icon: Icon,
+  title,
+  description,
+  checked,
+  disabled,
+  onCheckedChange,
+  meta,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  checked: boolean;
+  disabled?: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  meta?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-lg border bg-background p-4">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="rounded-lg bg-muted p-2.5 text-muted-foreground">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{title}</p>
+          <p className="text-sm text-muted-foreground">{description}</p>
+          {meta && <p className="mt-1 text-xs text-muted-foreground">{meta}</p>}
+        </div>
+      </div>
+      <Switch
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onCheckedChange}
+      />
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -292,6 +415,7 @@ export default function SettingsPage() {
   const [newAccountCurrency, setNewAccountCurrency] = useState("NGN");
   const [newAccountBalance, setNewAccountBalance] = useState("");
   const [isAddingAccount, setIsAddingAccount] = useState(false);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [accountMessage, setAccountMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -342,6 +466,30 @@ export default function SettingsPage() {
   const recommendedCategory = useMemo(
     () => getRecommendedCategoryOption(newCategory, newCategoryType),
     [newCategory, newCategoryType],
+  );
+
+  const totalAccountBalance = useMemo(
+    () =>
+      accounts.reduce(
+        (total, account) => total + Number(account.balance ?? 0),
+        0,
+      ),
+    [accounts],
+  );
+
+  const customCategoryCount = useMemo(
+    () =>
+      categoryRecords.filter(
+        (category) => category.user_id && category.user_id === currentUserId,
+      ).length,
+    [categoryRecords, currentUserId],
+  );
+
+  const enabledNotificationCount = useMemo(
+    () =>
+      Object.values(notifications).filter(Boolean).length +
+      (browserNotificationsEnabled ? 1 : 0),
+    [browserNotificationsEnabled, notifications],
   );
 
   useEffect(() => {
@@ -717,6 +865,46 @@ export default function SettingsPage() {
     }
   };
 
+  const transferBetweenAccounts = async (transfer: AccountTransferInput) => {
+    setAccountMessage(null);
+
+    try {
+      const response = await createAccountTransfer(transfer);
+      const updatedAccounts = [
+        response?.from_account,
+        response?.to_account,
+      ].filter(Boolean) as Account[];
+
+      if (updatedAccounts.length > 0) {
+        setAccounts((current) =>
+          current.map((account) => {
+            const updated = updatedAccounts.find(
+              (item) => String(item.id) === String(account.id),
+            );
+
+            return updated ? { ...account, ...updated } : account;
+          }),
+        );
+      } else {
+        setReloadTick((value) => value + 1);
+      }
+
+      setTransferDialogOpen(false);
+      setAccountMessage({
+        type: "success",
+        text: "Transfer recorded.",
+      });
+    } catch (error) {
+      setAccountMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Could not record the transfer.",
+      });
+    }
+  };
+
   const addCategory = async () => {
     const name = newCategory.trim();
     const duplicate = categoryRecords.some(
@@ -1047,20 +1235,26 @@ export default function SettingsPage() {
     }
   };
 
-  const messageClass = (type: "success" | "error") =>
-    cn("text-sm", type === "success" ? "text-success" : "text-destructive");
-
   if (isLoading) {
     return (
       <div className="space-y-6 animate-pulse">
-        <div>
-          <div className="h-8 w-36 rounded-md bg-muted" />
-          <div className="mt-2 h-4 w-80 rounded-md bg-muted" />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="h-8 w-36 rounded-md bg-muted" />
+            <div className="mt-2 h-4 w-80 max-w-full rounded-md bg-muted" />
+          </div>
+          <div className="h-10 w-28 rounded-md bg-muted" />
         </div>
 
-        <div className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted p-1 lg:grid-cols-5">
+        <div className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg bg-muted p-1 lg:grid-cols-5">
           {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="h-9 rounded-sm bg-background/60" />
+            <div key={index} className="h-10 rounded-md bg-background/70" />
+          ))}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="h-24 rounded-lg border bg-card" />
           ))}
         </div>
 
@@ -1097,8 +1291,8 @@ export default function SettingsPage() {
   if (hasError) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
           <p className="text-muted-foreground">
             Manage your account and application preferences
           </p>
@@ -1113,70 +1307,143 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">
-          Manage your account and application preferences
-        </p>
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="mt-1 text-muted-foreground">
+            Tune your profile, money structure, alerts, and account security.
+          </p>
+        </div>
+        <Badge variant="secondary" className="w-fit gap-2 px-3 py-1">
+          <Shield className="h-3.5 w-3.5" />
+          {mfa.enabled ? "2FA protected" : "Standard security"}
+        </Badge>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-muted-foreground">Accounts</p>
+              <p className="mt-1 text-2xl font-semibold">{accounts.length}</p>
+            </div>
+            <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
+              <CreditCard className="h-5 w-5" />
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {formatAccountBalance(totalAccountBalance)} tracked
+          </p>
+        </div>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-muted-foreground">Categories</p>
+              <p className="mt-1 text-2xl font-semibold">
+                {categoryRecords.length}
+              </p>
+            </div>
+            <div className="rounded-lg bg-success/10 p-2.5 text-success">
+              <Tag className="h-5 w-5" />
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {customCategoryCount} custom labels
+          </p>
+        </div>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-muted-foreground">Alerts</p>
+              <p className="mt-1 text-2xl font-semibold">
+                {enabledNotificationCount}
+              </p>
+            </div>
+            <div className="rounded-lg bg-blue-500/10 p-2.5 text-blue-600">
+              <BellRing className="h-5 w-5" />
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Active notification channels
+          </p>
+        </div>
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid h-auto w-full grid-cols-2 lg:grid-cols-5">
-          <TabsTrigger value="profile" className="gap-2 py-2">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg p-1 lg:grid-cols-5">
+          <TabsTrigger value="profile" className="gap-2 py-2.5">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Profile</span>
           </TabsTrigger>
-          <TabsTrigger value="accounts" className="gap-2 py-2">
+          <TabsTrigger value="accounts" className="gap-2 py-2.5">
             <CreditCard className="h-4 w-4" />
             <span className="hidden sm:inline">Accounts</span>
           </TabsTrigger>
-          <TabsTrigger value="categories" className="gap-2 py-2">
+          <TabsTrigger value="categories" className="gap-2 py-2.5">
             <Tag className="h-4 w-4" />
             <span className="hidden sm:inline">Categories</span>
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2 py-2">
+          <TabsTrigger value="notifications" className="gap-2 py-2.5">
             <Bell className="h-4 w-4" />
             <span className="hidden sm:inline">Notifications</span>
           </TabsTrigger>
-          <TabsTrigger value="security" className="gap-2 py-2">
+          <TabsTrigger value="security" className="gap-2 py-2.5">
             <Shield className="h-4 w-4" />
             <span className="hidden sm:inline">Security</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-6">
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>
-                Update the details used across your InsightFi account
-              </CardDescription>
+              <SectionHeader
+                icon={User}
+                title="Profile Information"
+                description="Update the details used across your InsightFi account."
+              />
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src={profileForm.avatarUrl || undefined} />
-                  <AvatarFallback className="bg-primary text-xl text-primary-foreground">
-                    {profileInitials}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 gap-2">
-                  <Label htmlFor="avatarUrl">Profile photo URL</Label>
-                  <div className="relative">
-                    <Camera className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="avatarUrl"
-                      value={profileForm.avatarUrl}
-                      onChange={(event) =>
-                        updateProfileField("avatarUrl", event.target.value)
-                      }
-                      placeholder="https://example.com/photo.jpg"
-                      className="pl-9"
-                    />
+              <SettingsPanel className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="relative shrink-0">
+                  <Avatar className="h-20 w-20 border shadow-sm">
+                    <AvatarImage src={profileForm.avatarUrl || undefined} />
+                    <AvatarFallback className="bg-primary text-xl text-primary-foreground">
+                      {profileInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute -bottom-1 -right-1 rounded-md border bg-background p-1.5 text-muted-foreground shadow-sm">
+                    <Camera className="h-3.5 w-3.5" />
                   </div>
                 </div>
-              </div>
+                <div className="grid flex-1 gap-3">
+                  <div>
+                    <p className="font-medium">
+                      {profileForm.firstName || profileForm.lastName
+                        ? `${profileForm.firstName} ${profileForm.lastName}`.trim()
+                        : "InsightFi user"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {profileForm.email || authEmail || "No email set"}
+                    </p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="avatarUrl">Profile photo URL</Label>
+                    <div className="relative">
+                      <Camera className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="avatarUrl"
+                        value={profileForm.avatarUrl}
+                        onChange={(event) =>
+                          updateProfileField("avatarUrl", event.target.value)
+                        }
+                        placeholder="https://example.com/photo.jpg"
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </SettingsPanel>
 
               <Separator />
 
@@ -1214,21 +1481,35 @@ export default function SettingsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="university">University</Label>
-                  <Input
-                    id="university"
-                    value={profileForm.university}
-                    onChange={(event) =>
-                      updateProfileField("university", event.target.value)
-                    }
-                    placeholder="Optional"
-                  />
+                  <div className="relative">
+                    <GraduationCap className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="university"
+                      value={profileForm.university}
+                      onChange={(event) =>
+                        updateProfileField("university", event.target.value)
+                      }
+                      placeholder="Optional"
+                      className="pl-9"
+                    />
+                  </div>
                 </div>
               </div>
 
               <Separator />
 
-              <div className="grid gap-2 md:max-w-sm">
-                <Label>Date Format</Label>
+              <SettingsPanel className="grid gap-3 md:grid-cols-[1fr_260px] md:items-center">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-lg bg-muted p-2.5 text-muted-foreground">
+                    <CalendarDays className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Date Format</p>
+                    <p className="text-sm text-muted-foreground">
+                      Choose how dates appear in reports and transaction views.
+                    </p>
+                  </div>
+                </div>
                 <Select
                   value={profileForm.dateFormat}
                   onValueChange={(value) => updateProfileField("dateFormat", value)}
@@ -1242,13 +1523,9 @@ export default function SettingsPage() {
                     <SelectItem value="ymd">YYYY-MM-DD</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </SettingsPanel>
 
-              {profileMessage && (
-                <p className={messageClass(profileMessage.type)}>
-                  {profileMessage.text}
-                </p>
-              )}
+              <StatusMessage message={profileMessage} />
 
               <div className="flex justify-end">
                 <Button onClick={saveProfile} disabled={isSavingProfile}>
@@ -1260,16 +1537,34 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="accounts" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Manage Accounts</CardTitle>
-              <CardDescription>
-                Create accounts with their own currency and starting amount
-              </CardDescription>
+          <Card className="shadow-sm">
+            <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <SectionHeader
+                icon={CreditCard}
+                title="Accounts"
+                description="Create accounts, track balances, and move money between them."
+                action={
+                  <Button
+                    onClick={() => setTransferDialogOpen(true)}
+                    disabled={accounts.length < 2}
+                    className="gap-2 sm:w-auto"
+                  >
+                    <ArrowRightLeft className="h-4 w-4" />
+                    Transfer
+                  </Button>
+                }
+              />
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <h4 className="font-medium">Add New Account</h4>
+              <SettingsPanel className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-medium">Add New Account</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Starting amount is added to this account balance.
+                    </p>
+                  </div>
+                </div>
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_160px_140px_180px_auto]">
                   <Input
                     placeholder="Account name"
@@ -1324,53 +1619,76 @@ export default function SettingsPage() {
                     {isAddingAccount ? "Adding..." : "Add"}
                   </Button>
                 </div>
-                {accountMessage && (
-                  <p className={messageClass(accountMessage.type)}>
-                    {accountMessage.text}
-                  </p>
-                )}
-              </div>
+              </SettingsPanel>
 
-              <Separator />
+              <StatusMessage message={accountMessage} />
 
               <div className="space-y-3">
-                <h4 className="font-medium">Your Accounts</h4>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-medium">Your Accounts</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {accounts.length} account{accounts.length === 1 ? "" : "s"} in
+                      your workspace
+                    </p>
+                  </div>
+                  <Badge variant="outline">
+                    {formatAccountBalance(totalAccountBalance)}
+                  </Badge>
+                </div>
                 <div className="grid gap-3">
-                  {accounts.map((account) => (
-                    <div
-                      key={account.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border p-4"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                          <CreditCard className="h-5 w-5" />
+                  {accounts.length === 0 ? (
+                    <EmptyState
+                      icon={CreditCard}
+                      title="No accounts yet"
+                      description="Add your first account to start tracking balances."
+                      variant="inline"
+                    />
+                  ) : (
+                    accounts.map((account) => (
+                      <div
+                        key={account.id}
+                        className="flex items-center justify-between gap-3 rounded-lg border bg-background p-4 transition-colors hover:bg-muted/30"
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <CreditCard className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{account.name}</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                              <Badge variant="secondary" className="capitalize">
+                                {account.type}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {account.currency ?? "NGN"}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="truncate font-medium">{account.name}</p>
-                          <p className="text-xs capitalize text-muted-foreground">
-                            {account.type} account
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <div className="hidden text-right sm:block">
+                            <p className="text-sm font-semibold">
+                              {formatAccountBalance(
+                                account.balance,
+                                account.currency ?? "NGN",
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Balance</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteAccount(account.id)}
+                            className="text-destructive hover:text-destructive"
+                            aria-label={`Delete ${account.name}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Badge variant="secondary">{account.currency ?? "NGN"}</Badge>
-                        {account.balance !== undefined && (
-                          <span className="hidden text-sm text-muted-foreground sm:inline">
-                            {Number(account.balance).toLocaleString()}
-                          </span>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deleteAccount(account.id)}
-                          className="text-destructive hover:text-destructive"
-                          aria-label={`Delete ${account.name}`}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -1378,16 +1696,23 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="categories" className="space-y-6">
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Manage Categories</CardTitle>
-              <CardDescription>
-                Add categories with icons that make transactions easier to scan
-              </CardDescription>
+              <SectionHeader
+                icon={Tag}
+                title="Categories"
+                description="Design the labels and icons that make transactions easier to scan."
+              />
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <h4 className="font-medium">Add New Category</h4>
+              <SettingsPanel className="space-y-4">
+                <div>
+                  <h4 className="font-medium">Add New Category</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Pick a type first, then choose an icon that matches how you
+                    think about the spending.
+                  </p>
+                </div>
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_160px_auto]">
                   <Input
                     placeholder="Category name"
@@ -1424,7 +1749,7 @@ export default function SettingsPage() {
                   </Button>
                 </div>
 
-                <div className="rounded-lg border p-4">
+                <div className="rounded-lg border bg-background p-4">
                   <div className="mb-3 flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium">Icon</p>
                     <Badge variant="secondary" className="gap-1">
@@ -1460,71 +1785,88 @@ export default function SettingsPage() {
                     })}
                   </div>
                 </div>
+              </SettingsPanel>
 
-                {categoryMessage && (
-                  <p className={messageClass(categoryMessage.type)}>
-                    {categoryMessage.text}
-                  </p>
-                )}
-              </div>
-
-              <Separator />
+              <StatusMessage message={categoryMessage} />
 
               <div className="space-y-3">
-                <h4 className="font-medium">Your Categories</h4>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-medium">Your Categories</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Defaults plus your custom transaction labels.
+                    </p>
+                  </div>
+                  <Badge variant="outline">
+                    {categoryRecords.length} total
+                  </Badge>
+                </div>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {categoryRecords.map((category) => {
-                    const Icon = resolveCategoryIcon(category.icon);
-                    const option =
-                      categoryIconOptions.find(
-                        (item) => item.value === category.icon,
-                      ) ?? categoryIconOptions.at(-1)!;
-                    const canDelete =
-                      category.user_id === undefined ||
-                      category.user_id === currentUserId;
+                  {categoryRecords.length === 0 ? (
+                    <div className="md:col-span-2 xl:col-span-3">
+                      <EmptyState
+                        icon={Tag}
+                        title="No categories yet"
+                        description="Add a category to start organizing transactions."
+                        variant="inline"
+                      />
+                    </div>
+                  ) : (
+                    categoryRecords.map((category) => {
+                      const Icon = resolveCategoryIcon(category.icon);
+                      const option =
+                        categoryIconOptions.find(
+                          (item) => item.value === category.icon,
+                        ) ?? categoryIconOptions.at(-1)!;
+                      const canDelete =
+                        category.user_id === undefined ||
+                        category.user_id === currentUserId;
 
-                    return (
-                      <div
-                        key={category.id}
-                        className="flex items-center justify-between gap-3 rounded-lg border p-4"
-                      >
-                        <div className="flex min-w-0 items-center gap-3">
-                          <div
-                            className={cn(
-                              "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-                              category.color || option.color,
-                            )}
-                          >
-                            <Icon className="h-5 w-5" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate font-medium">{category.name}</p>
-                            <div className="mt-1 flex items-center gap-2">
-                              <Badge variant="secondary" className="capitalize">
-                                {category.type ?? "expense"}
-                              </Badge>
-                              {category.user_id === null && (
-                                <span className="text-xs text-muted-foreground">
-                                  Default
-                                </span>
+                      return (
+                        <div
+                          key={category.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border bg-background p-4 transition-colors hover:bg-muted/30"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div
+                              className={cn(
+                                "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                                category.color || option.color,
                               )}
+                            >
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate font-medium">
+                                {category.name}
+                              </p>
+                              <div className="mt-1 flex items-center gap-2">
+                                <Badge variant="secondary" className="capitalize">
+                                  {category.type ?? "expense"}
+                                </Badge>
+                                {category.user_id === null && (
+                                  <span className="text-xs text-muted-foreground">
+                                    Default
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deleteCategory(category)}
+                              className="text-destructive hover:text-destructive"
+                              aria-label={`Delete ${category.name}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
-                        {canDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => deleteCategory(category)}
-                            className="text-destructive hover:text-destructive"
-                            aria-label={`Delete ${category.name}`}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -1532,164 +1874,122 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="notifications" className="space-y-6">
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>
-                Choose what InsightFi should alert you about
-              </CardDescription>
+              <SectionHeader
+                icon={Bell}
+                title="Notifications"
+                description="Choose what InsightFi should alert you about."
+              />
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="rounded-lg border p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
-                      <BellRing className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">Browser Notifications</p>
-                      <p className="text-sm text-muted-foreground">
-                        Show desktop alerts while InsightFi is open
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Permission: {browserPermission}
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={browserNotificationsEnabled}
-                    disabled={browserPermission === "unsupported"}
-                    onCheckedChange={updateBrowserNotifications}
-                  />
-                </div>
+              <ToggleRow
+                icon={BellRing}
+                title="Browser Notifications"
+                description="Show desktop alerts while InsightFi is open."
+                meta={`Permission: ${browserPermission}`}
+                checked={browserNotificationsEnabled}
+                disabled={browserPermission === "unsupported"}
+                onCheckedChange={updateBrowserNotifications}
+              />
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <ToggleRow
+                  icon={SlidersHorizontal}
+                  title="Budget Alerts"
+                  description="Get notified when you approach budget limits."
+                  checked={notifications.budgetAlerts}
+                  onCheckedChange={(checked) =>
+                    updateNotifications("budgetAlerts", checked)
+                  }
+                />
+                <ToggleRow
+                  icon={Receipt}
+                  title="Transaction Alerts"
+                  description="Notify me of large or unusual transactions."
+                  checked={notifications.transactionAlerts}
+                  onCheckedChange={(checked) =>
+                    updateNotifications("transactionAlerts", checked)
+                  }
+                />
+                <ToggleRow
+                  icon={Wallet}
+                  title="Savings Goals"
+                  description="Updates on your savings goal progress."
+                  checked={notifications.savingsGoals}
+                  onCheckedChange={(checked) =>
+                    updateNotifications("savingsGoals", checked)
+                  }
+                />
+                <ToggleRow
+                  icon={CalendarDays}
+                  title="Weekly Report"
+                  description="Receive a weekly summary of your finances."
+                  checked={notifications.weeklyReport}
+                  onCheckedChange={(checked) =>
+                    updateNotifications("weeklyReport", checked)
+                  }
+                />
+                <ToggleRow
+                  icon={Briefcase}
+                  title="Market Updates"
+                  description="Investment and market news."
+                  checked={notifications.marketUpdates}
+                  onCheckedChange={(checked) =>
+                    updateNotifications("marketUpdates", checked)
+                  }
+                />
+                <ToggleRow
+                  icon={Bell}
+                  title="Newsletter"
+                  description="Financial tips and product updates."
+                  checked={notifications.newsletter}
+                  onCheckedChange={(checked) =>
+                    updateNotifications("newsletter", checked)
+                  }
+                />
               </div>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <h4 className="font-medium">Budget & Spending</h4>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-medium text-sm">Budget Alerts</p>
-                      <p className="text-sm text-muted-foreground">
-                        Get notified when you approach budget limits
-                      </p>
-                    </div>
-                    <Switch
-                      checked={notifications.budgetAlerts}
-                      onCheckedChange={(checked) =>
-                        updateNotifications("budgetAlerts", checked)
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-medium text-sm">Transaction Alerts</p>
-                      <p className="text-sm text-muted-foreground">
-                        Notify me of large or unusual transactions
-                      </p>
-                    </div>
-                    <Switch
-                      checked={notifications.transactionAlerts}
-                      onCheckedChange={(checked) =>
-                        updateNotifications("transactionAlerts", checked)
-                      }
-                    />
-                  </div>
+              <SettingsPanel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium">Notification Summary</p>
+                  <p className="text-sm text-muted-foreground">
+                    {enabledNotificationCount} alert
+                    {enabledNotificationCount === 1 ? "" : "s"} currently enabled.
+                  </p>
                 </div>
-              </div>
+                <Badge variant="secondary" className="w-fit">
+                  {enabledNotificationCount > 0 ? "Active" : "Quiet mode"}
+                </Badge>
+              </SettingsPanel>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <h4 className="font-medium">Savings & Goals</h4>
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="font-medium text-sm">Savings Goals</p>
-                    <p className="text-sm text-muted-foreground">
-                      Updates on your savings goal progress
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.savingsGoals}
-                    onCheckedChange={(checked) =>
-                      updateNotifications("savingsGoals", checked)
-                    }
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-4">
-                <h4 className="font-medium">Reports & Updates</h4>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-medium text-sm">Weekly Report</p>
-                      <p className="text-sm text-muted-foreground">
-                        Receive a weekly summary of your finances
-                      </p>
-                    </div>
-                    <Switch
-                      checked={notifications.weeklyReport}
-                      onCheckedChange={(checked) =>
-                        updateNotifications("weeklyReport", checked)
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-medium text-sm">Market Updates</p>
-                      <p className="text-sm text-muted-foreground">
-                        Investment and market news
-                      </p>
-                    </div>
-                    <Switch
-                      checked={notifications.marketUpdates}
-                      onCheckedChange={(checked) =>
-                        updateNotifications("marketUpdates", checked)
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-medium text-sm">Newsletter</p>
-                      <p className="text-sm text-muted-foreground">
-                        Financial tips and product updates
-                      </p>
-                    </div>
-                    <Switch
-                      checked={notifications.newsletter}
-                      onCheckedChange={(checked) =>
-                        updateNotifications("newsletter", checked)
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {notificationMessage && (
-                <p className={messageClass(notificationMessage.type)}>
-                  {notificationMessage.text}
-                </p>
-              )}
+              <StatusMessage message={notificationMessage} />
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="security" className="space-y-6">
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Security Settings</CardTitle>
-              <CardDescription>
-                Manage password, 2FA, exports, and account access
-              </CardDescription>
+              <SectionHeader
+                icon={Shield}
+                title="Security"
+                description="Manage password, 2FA, exports, and account access."
+              />
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <h4 className="font-medium">Password</h4>
+              <SettingsPanel className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-lg bg-muted p-2.5 text-muted-foreground">
+                    <KeyRound className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Password</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Update the password used to sign in to your account.
+                    </p>
+                  </div>
+                </div>
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-2">
                     <Label htmlFor="currentPassword">Current Password</Label>
@@ -1737,62 +2037,67 @@ export default function SettingsPage() {
                 <Button onClick={updatePassword} disabled={isUpdatingPassword}>
                   {isUpdatingPassword ? "Updating..." : "Update Password"}
                 </Button>
-              </div>
+              </SettingsPanel>
 
-              <Separator />
+              <ToggleRow
+                icon={Smartphone}
+                title="Authenticator App"
+                description="Protect your account with a verification code."
+                meta={mfa.enabled ? "Enabled" : "Not enabled"}
+                checked={mfa.enabled || Boolean(mfa.qrCode)}
+                disabled={mfa.loading}
+                onCheckedChange={startMfaEnrollment}
+              />
 
-              <div className="space-y-4">
-                <h4 className="font-medium">Two-Factor Authentication</h4>
-                <div className="flex items-center justify-between gap-4">
+              {mfa.qrCode && (
+                <div className="grid gap-4 rounded-lg border bg-background p-4 md:grid-cols-[160px_1fr]">
+                  <img
+                    src={mfa.qrCode}
+                    alt="Authenticator QR code"
+                    className="h-40 w-40 rounded-md border bg-white p-2"
+                  />
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-medium">Scan this code</p>
+                      <p className="text-sm text-muted-foreground">
+                        Enter the six-digit code from your authenticator app.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="mfaCode">Verification Code</Label>
+                      <Input
+                        id="mfaCode"
+                        inputMode="numeric"
+                        value={mfa.verificationCode}
+                        onChange={(event) =>
+                          setMfa((current) => ({
+                            ...current,
+                            verificationCode: event.target.value,
+                          }))
+                        }
+                        placeholder="123456"
+                      />
+                    </div>
+                    <Button onClick={verifyMfa} disabled={mfa.loading}>
+                      {mfa.loading ? "Verifying..." : "Verify 2FA"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <SettingsPanel className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-lg bg-muted p-2.5 text-muted-foreground">
+                    <Database className="h-5 w-5" />
+                  </div>
                   <div>
-                    <p className="text-sm font-medium">Authenticator App</p>
+                    <h4 className="font-medium">Data & Privacy</h4>
                     <p className="text-sm text-muted-foreground">
-                      Protect your account with a verification code
+                      Export your records or permanently remove your account.
                     </p>
                   </div>
-                  <Switch
-                    checked={mfa.enabled || Boolean(mfa.qrCode)}
-                    disabled={mfa.loading}
-                    onCheckedChange={startMfaEnrollment}
-                  />
                 </div>
-
-                {mfa.qrCode && (
-                  <div className="grid gap-4 rounded-lg border p-4 md:grid-cols-[160px_1fr]">
-                    <img
-                      src={mfa.qrCode}
-                      alt="Authenticator QR code"
-                      className="h-40 w-40 rounded-md border bg-white p-2"
-                    />
-                    <div className="space-y-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="mfaCode">Verification Code</Label>
-                        <Input
-                          id="mfaCode"
-                          inputMode="numeric"
-                          value={mfa.verificationCode}
-                          onChange={(event) =>
-                            setMfa((current) => ({
-                              ...current,
-                              verificationCode: event.target.value,
-                            }))
-                          }
-                          placeholder="123456"
-                        />
-                      </div>
-                      <Button onClick={verifyMfa} disabled={mfa.loading}>
-                        {mfa.loading ? "Verifying..." : "Verify 2FA"}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <Separator />
-
-              <div className="space-y-4">
-                <h4 className="font-medium">Data & Privacy</h4>
-                <div className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <Button
                     variant="outline"
                     className="w-full justify-start gap-2 bg-transparent"
@@ -1811,17 +2116,23 @@ export default function SettingsPage() {
                     Delete Account
                   </Button>
                 </div>
-              </div>
+              </SettingsPanel>
 
-              {securityMessage && (
-                <p className={messageClass(securityMessage.type)}>
-                  {securityMessage.text}
-                </p>
-              )}
+              <StatusMessage message={securityMessage} />
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+      <AddTransactionDialog
+        open={transferDialogOpen}
+        onOpenChange={setTransferDialogOpen}
+        accounts={accounts}
+        categories={categoryRecords}
+        defaultMode="transfer"
+        showModeToggle={false}
+        onSubmit={async () => undefined}
+        onTransferSubmit={transferBetweenAccounts}
+      />
     </div>
   );
 }
