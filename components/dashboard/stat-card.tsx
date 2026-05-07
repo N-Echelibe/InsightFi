@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingDown, TrendingUp } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface StatCardProps {
@@ -24,16 +24,23 @@ export function StatCard({
   iconColor = "bg-primary/10 text-primary",
   isCurrency = false,
 }: StatCardProps) {
-  const formattedValue = isCurrency && typeof value === "number"
-    ? `₦${value.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    : String(value);
+  const formattedValue =
+    isCurrency && typeof value === "number"
+      ? `${"\u20a6"}${value.toLocaleString("en-NG", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`
+      : String(value);
+
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="transition-shadow hover:shadow-md">
       <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 space-y-1">
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold tracking-tight">{formattedValue}</p>
+            <p className="truncate text-2xl font-bold tracking-tight">
+              {formattedValue}
+            </p>
             {change && (
               <div className="flex items-center gap-1">
                 {trend === "up" && (
@@ -44,10 +51,10 @@ export function StatCard({
                 )}
                 <span
                   className={cn(
-                    "text-xs font-medium",
+                    "truncate text-xs font-medium",
                     trend === "up" && "text-success",
                     trend === "down" && "text-destructive",
-                    trend === "neutral" && "text-muted-foreground"
+                    trend === "neutral" && "text-muted-foreground",
                   )}
                 >
                   {change}
@@ -55,7 +62,7 @@ export function StatCard({
               </div>
             )}
           </div>
-          <div className={cn("p-2.5 rounded-lg", iconColor)}>
+          <div className={cn("shrink-0 rounded-lg p-2.5", iconColor)}>
             <Icon className="h-5 w-5" />
           </div>
         </div>

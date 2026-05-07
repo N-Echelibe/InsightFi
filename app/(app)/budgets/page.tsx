@@ -7,7 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertTriangle,
   Bell,
@@ -20,6 +25,9 @@ import {
   Plus,
   ShoppingBag,
   Target,
+  Edit,
+  MoreHorizontal,
+  Trash2,
   TrendingDown,
   TrendingUp,
   Utensils,
@@ -29,7 +37,6 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { BudgetDialog } from "@/components/budgets/budget-dialog";
-import { SavingsBuckets } from "@/components/budgets/savings-buckets";
 import { CardSkeleton } from "@/components/skeletons";
 import { ErrorState, EmptyState } from "@/components/states";
 
@@ -186,9 +193,15 @@ function getBudgetStatus(percentageUsed: number) {
 function BudgetCard({
   budget,
   onOpen,
+  onEdit,
+  onToggleAlerts,
+  onDelete,
 }: {
   budget: BudgetItem;
   onOpen: () => void;
+  onEdit: () => void;
+  onToggleAlerts: () => void;
+  onDelete: () => void;
 }) {
   const percentageUsed = (budget.spent / budget.budget) * 100;
   const displayPercentage = Math.round(percentageUsed);
@@ -234,7 +247,7 @@ function BudgetCard({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
             {budget.alerts ? (
               <Bell className="h-4 w-4 text-primary" />
             ) : (
@@ -246,6 +259,39 @@ function BudgetCard({
             >
               {isOverBudget ? "Over" : status.label}
             </Badge>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  aria-label={`Open actions for ${budget.category}`}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onToggleAlerts}>
+                  {budget.alerts ? (
+                    <BellOff className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Bell className="h-4 w-4 mr-2" />
+                  )}
+                  {budget.alerts ? "Disable Alerts" : "Enable Alerts"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={onDelete}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -282,7 +328,7 @@ function BudgetCard({
 export default function BudgetsPage() {
   const router = useRouter();
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
-  const selectedBudget: BudgetItem | null = null;
+  const [selectedBudget, setSelectedBudget] = useState<BudgetItem | null>(null);
   const [budgets, setBudgets] = useState<BudgetItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -384,6 +430,49 @@ export default function BudgetsPage() {
     setReloadTick((value) => value + 1);
   };
 
+  const openCreateBudgetDialog = () => {
+    setSelectedBudget(null);
+    setBudgetDialogOpen(true);
+  };
+
+  const openEditBudgetDialog = (budget: BudgetItem) => {
+    setSelectedBudget(budget);
+    setBudgetDialogOpen(true);
+  };
+
+  const toggleBudgetAlerts = async (budget: BudgetItem) => {
+    const nextAlerts = !budget.alerts;
+
+    setBudgets((items) =>
+      items.map((item) =>
+        item.id === budget.id ? { ...item, alerts: nextAlerts } : item
+      )
+    );
+
+    try {
+      await api.patch(`/budgets/${budget.id}`, {
+        alert: nextAlerts,
+        alerts: nextAlerts,
+      });
+    } catch (error) {
+      console.error(error);
+      setBudgets((items) =>
+        items.map((item) =>
+          item.id === budget.id ? { ...item, alerts: budget.alerts } : item
+        )
+      );
+    }
+  };
+
+  const deleteBudget = async (budget: BudgetItem) => {
+    if (!window.confirm(`Delete ${budget.category} budget? This cannot be undone.`)) {
+      return;
+    }
+
+    await api.delete(`/budgets/${budget.id}`);
+    setBudgets((items) => items.filter((item) => item.id !== budget.id));
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -398,8 +487,6 @@ export default function BudgetsPage() {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <CardSkeleton count={4} variant="stat" />
         </div>
-
-        <div className="h-10 w-56 rounded-md bg-muted" />
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -498,8 +585,15 @@ export default function BudgetsPage() {
           description="Create your first budget to start tracking your spending and achieving your financial goals."
           action={{
             label: "Create Budget",
-            onClick: () => setBudgetDialogOpen(true),
+            onClick: openCreateBudgetDialog,
           }}
+        />
+        <BudgetDialog
+          open={budgetDialogOpen}
+          onOpenChange={setBudgetDialogOpen}
+          budget={selectedBudget}
+          categories={categories}
+          onSubmit={handleSaveBudget}
         />
       </div>
     );
@@ -516,7 +610,7 @@ export default function BudgetsPage() {
         </div>
         <Button
           className="w-full gap-2 sm:w-auto"
-          onClick={() => setBudgetDialogOpen(true)}
+          onClick={openCreateBudgetDialog}
         >
           <Plus className="h-4 w-4" />
           Create Budget
@@ -569,91 +663,81 @@ export default function BudgetsPage() {
         />
       </div>
 
-      <Tabs defaultValue="budgets" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="budgets">Budgets</TabsTrigger>
-          <TabsTrigger value="savings">Savings Buckets</TabsTrigger>
-        </TabsList>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {budgets.map((budget) => (
+            <BudgetCard
+              key={budget.id}
+              budget={budget}
+              onOpen={() => router.push(`/budgets/${budget.id}`)}
+              onEdit={() => openEditBudgetDialog(budget)}
+              onToggleAlerts={() => toggleBudgetAlerts(budget)}
+              onDelete={() => deleteBudget(budget)}
+            />
+          ))}
+        </div>
 
-        <TabsContent value="budgets" className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {budgets.map((budget) => (
-                <BudgetCard
-                  key={budget.id}
-                  budget={budget}
-                  onOpen={() => router.push(`/budgets/${budget.id}`)}
-                />
-              ))}
+        <Card className="h-fit">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Budget Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg border p-3 text-center">
+                <p className="text-lg font-bold text-emerald-600">
+                  {safeBudgetItems.length}
+                </p>
+                <p className="text-xs text-muted-foreground">Safe</p>
+              </div>
+              <div className="rounded-lg border p-3 text-center">
+                <p className="text-lg font-bold text-amber-600">
+                  {warningBudgetItems.length}
+                </p>
+                <p className="text-xs text-muted-foreground">Warning</p>
+              </div>
+              <div className="rounded-lg border p-3 text-center">
+                <p className="text-lg font-bold text-rose-600">
+                  {dangerBudgetItems.length}
+                </p>
+                <p className="text-xs text-muted-foreground">Danger</p>
+              </div>
             </div>
 
-            <Card className="h-fit">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Budget Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-lg border p-3 text-center">
-                    <p className="text-lg font-bold text-emerald-600">
-                      {safeBudgetItems.length}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Safe</p>
-                  </div>
-                  <div className="rounded-lg border p-3 text-center">
-                    <p className="text-lg font-bold text-amber-600">
-                      {warningBudgetItems.length}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Warning</p>
-                  </div>
-                  <div className="rounded-lg border p-3 text-center">
-                    <p className="text-lg font-bold text-rose-600">
-                      {dangerBudgetItems.length}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Danger</p>
-                  </div>
-                </div>
+            <div className="rounded-lg bg-muted/40 p-3">
+              <p className="text-xs font-medium text-muted-foreground">
+                Tightest Budget
+              </p>
+              <p className="mt-1 font-semibold">{tightestBudget.category}</p>
+              <p className="text-sm text-muted-foreground">
+                {Math.round((tightestBudget.spent / tightestBudget.budget) * 100)}
+                % used
+              </p>
+            </div>
 
-                <div className="rounded-lg bg-muted/40 p-3">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Tightest Budget
-                  </p>
-                  <p className="mt-1 font-semibold">{tightestBudget.category}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {Math.round((tightestBudget.spent / tightestBudget.budget) * 100)}
-                    % used
-                  </p>
-                </div>
-
-                {overBudgetItems.length > 0 ? (
-                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-                    <p className="text-xs font-medium text-destructive">
-                      Needs attention
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {overBudgetItems.length} budget
-                      {overBudgetItems.length === 1 ? " is" : "s are"} over the
-                      limit.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-                    <p className="text-xs font-medium text-emerald-700">
-                      No overages
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      All budgets are currently within their limits.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="savings">
-          <SavingsBuckets />
-        </TabsContent>
-      </Tabs>
+            {overBudgetItems.length > 0 ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                <p className="text-xs font-medium text-destructive">
+                  Needs attention
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {overBudgetItems.length} budget
+                  {overBudgetItems.length === 1 ? " is" : "s are"} over the
+                  limit.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+                <p className="text-xs font-medium text-emerald-700">
+                  No overages
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  All budgets are currently within their limits.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <BudgetDialog
         open={budgetDialogOpen}

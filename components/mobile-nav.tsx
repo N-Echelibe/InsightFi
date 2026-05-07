@@ -10,6 +10,7 @@ import {
   Lightbulb,
   FileBarChart,
   Settings,
+  Target,
   Wallet,
 } from "lucide-react";
 
@@ -28,6 +29,11 @@ const navItems = [
     title: "Budgets",
     href: "/budgets",
     icon: PiggyBank,
+  },
+  {
+    title: "Goals",
+    href: "/goals",
+    icon: Target,
   },
   {
     title: "Insights",

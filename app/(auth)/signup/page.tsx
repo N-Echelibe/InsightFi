@@ -16,7 +16,8 @@ import { supabase } from '@/lib/supabase'
 export default function SignupPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
-    fullName: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -33,8 +34,12 @@ export default function SignupPage() {
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = 'Please enter your full name.'
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = 'Please enter your first name.'
+    }
+
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = 'Please enter your last name.'
     }
 
     if (!formData.email.trim()) {
@@ -89,13 +94,21 @@ export default function SignupPage() {
     setIsLoading(true)
     setSubmitMessage(null)
 
+    const firstName = formData.firstName.trim()
+    const lastName = formData.lastName.trim()
+    const fullName = `${firstName} ${lastName}`.trim()
+    const email = formData.email.trim()
+    const university = formData.university.trim()
+
     const { data, error } = await supabase.auth.signUp({
-      email: formData.email.trim(),
+      email,
       password: formData.password,
       options: {
         data: {
-          full_name: formData.fullName.trim(),
-          university: formData.university.trim(),
+          first_name: firstName,
+          last_name: lastName,
+          full_name: fullName,
+          university,
         },
       },
     })
@@ -104,6 +117,29 @@ export default function SignupPage() {
       setSubmitMessage({ type: 'error', text: error.message })
       setIsLoading(false)
       return
+    }
+
+    if (data.user?.id) {
+      const { error: profileError } = await supabase.from('profiles').upsert(
+        {
+          user_id: data.user.id,
+          full_name: fullName,
+          first_name: firstName,
+          last_name: lastName,
+          email,
+          university: university || null,
+        },
+        { onConflict: 'user_id' }
+      )
+
+      if (profileError) {
+        setSubmitMessage({
+          type: 'error',
+          text: `Account created, but we couldn't finish your profile: ${profileError.message}`,
+        })
+        setIsLoading(false)
+        return
+      }
     }
 
     setSubmitMessage({
@@ -127,20 +163,38 @@ export default function SignupPage() {
         description="Start tracking your spending, budgets, and savings as a student."
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="fullName">Full name</Label>
-            <Input
-              id="fullName"
-              name="fullName"
-              type="text"
-              placeholder="Your full name"
-              value={formData.fullName}
-              onChange={handleChange}
-              aria-invalid={!!errors.fullName}
-            />
-            {errors.fullName && (
-              <p className="text-sm text-destructive">{errors.fullName}</p>
-            )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First name</Label>
+              <Input
+                id="firstName"
+                name="firstName"
+                type="text"
+                placeholder="First name"
+                value={formData.firstName}
+                onChange={handleChange}
+                aria-invalid={!!errors.firstName}
+              />
+              {errors.firstName && (
+                <p className="text-sm text-destructive">{errors.firstName}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last name</Label>
+              <Input
+                id="lastName"
+                name="lastName"
+                type="text"
+                placeholder="Last name"
+                value={formData.lastName}
+                onChange={handleChange}
+                aria-invalid={!!errors.lastName}
+              />
+              {errors.lastName && (
+                <p className="text-sm text-destructive">{errors.lastName}</p>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">

@@ -7,23 +7,34 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EmptyState, ErrorState } from "@/components/states";
 import { CardSkeleton } from "@/components/skeletons";
 import {
   AlertTriangle,
   ArrowLeft,
+  Bell,
+  BellOff,
   BookOpen,
   Bus,
   CalendarDays,
   Clock,
+  Edit,
   Gamepad2,
   HeartHandshake,
   Home,
   Lightbulb,
+  MoreHorizontal,
   Percent,
   ReceiptText,
   ShieldCheck,
   Target,
+  Trash2,
   Utensils,
   Wallet,
   Wifi,
@@ -31,6 +42,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
+import { BudgetDialog } from "@/components/budgets/budget-dialog";
 
 type BudgetPeriod = "daily" | "weekly" | "monthly" | "yearly" | "onetime" | "custom";
 type BudgetStatus = "safe" | "warning" | "over";
@@ -42,6 +54,7 @@ type BudgetDetail = {
   name: string;
   spent: number;
   budget: number;
+  alerts?: boolean;
   type: BudgetPeriod;
   icon: LucideIcon;
   createdDate?: Date;
@@ -56,6 +69,13 @@ type RelatedTransaction = {
   date: string;
   amount: number;
   account: string;
+};
+
+type Category = {
+  id: string;
+  name: string;
+  type?: string;
+  icon?: string;
 };
 
 const dayMs = 24 * 60 * 60 * 1000;
@@ -414,7 +434,9 @@ export default function BudgetDetailPage() {
   const params = useParams();
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [budget, setBudget] = useState<BudgetDetail | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<RelatedTransaction[]>([]);
 
   useEffect(() => {
@@ -424,9 +446,12 @@ export default function BudgetDetailPage() {
         setIsLoading(true);
 
         const budgetId = String(params.id);
-        const [budgetResponse, transactionsResponse] = await Promise.all([
+        const [budgetResponse, transactionsResponse, categoriesResponse] = await Promise.all([
           api.get<{ budget: any }>(`/budgets/${budgetId}`),
           api.get<{ transactions: any[] }>(`/budgets/${budgetId}/transactions`),
+          api.get<{ categories: Category[] }>("/categories", {
+            query: { type: "expense" },
+          }),
         ]);
 
         const iconMap: Record<string, LucideIcon> = {
@@ -446,6 +471,7 @@ export default function BudgetDetailPage() {
           name: item.categories?.name ?? item.category_id?.name ?? "Budget",
           spent: Number(item.spent ?? item.expense ?? 0),
           budget: Number(item.budget ?? item.amount ?? 0),
+          alerts: Boolean(item.alert ?? item.alerts),
           type: item.period ?? item.type ?? "monthly",
           icon: iconMap[item.categories?.icon ?? item.category_id?.icon] ?? Target,
           startDate: item.start_date ? new Date(item.start_date) : undefined,
@@ -462,6 +488,7 @@ export default function BudgetDetailPage() {
             account: transaction.accounts?.name ?? "Account",
           })),
         );
+        setCategories(categoriesResponse.categories);
       } catch (error) {
         console.error(error);
         setHasError(true);
@@ -502,6 +529,91 @@ export default function BudgetDetailPage() {
     setHasError(false);
     setIsLoading(true);
     window.location.reload();
+  };
+
+  const handleSaveBudget = async (nextBudget: {
+    id?: string | number;
+    category_id: string;
+    amount: number;
+    period: string;
+    start_date?: string;
+    end_date?: string;
+    recurring: boolean;
+    alert: boolean;
+    alert_threshold: number;
+  }) => {
+    if (!budget) return;
+
+    const response = await api.patch<{ budget?: any }>(
+      `/budgets/${budget.id}`,
+      nextBudget
+    );
+    const updated = response.budget;
+    const category = categories.find((item) => item.id === nextBudget.category_id);
+
+    setBudget((current) =>
+      current
+        ? {
+            ...current,
+            category_id:
+              updated?.category_id?.id ??
+              updated?.category_id ??
+              nextBudget.category_id,
+            category:
+              updated?.categories?.name ??
+              updated?.category_id?.name ??
+              category?.name ??
+              current.category,
+            name:
+              updated?.categories?.name ??
+              updated?.category_id?.name ??
+              category?.name ??
+              current.name,
+            budget: Number(
+              updated?.budget ?? updated?.amount ?? nextBudget.amount
+            ),
+            alerts: Boolean(updated?.alert ?? updated?.alerts ?? nextBudget.alert),
+            type: (updated?.period ?? updated?.type ?? nextBudget.period) as BudgetPeriod,
+            startDate:
+              updated?.start_date || nextBudget.start_date
+                ? new Date(updated?.start_date ?? nextBudget.start_date)
+                : undefined,
+            endDate:
+              updated?.end_date || nextBudget.end_date
+                ? new Date(updated?.end_date ?? nextBudget.end_date)
+                : undefined,
+          }
+        : current
+    );
+  };
+
+  const toggleBudgetAlerts = async () => {
+    if (!budget) return;
+
+    const nextAlerts = !budget.alerts;
+    setBudget((current) =>
+      current ? { ...current, alerts: nextAlerts } : current
+    );
+
+    try {
+      await api.patch(`/budgets/${budget.id}`, {
+        alert: nextAlerts,
+        alerts: nextAlerts,
+      });
+    } catch (error) {
+      console.error(error);
+      setBudget((current) =>
+        current ? { ...current, alerts: budget.alerts } : current
+      );
+    }
+  };
+
+  const deleteBudget = async () => {
+    if (!budget) return;
+    if (!window.confirm(`Delete ${budget.name}? This cannot be undone.`)) return;
+
+    await api.delete(`/budgets/${budget.id}`);
+    router.push("/budgets");
   };
 
   if (isLoading) {
@@ -593,6 +705,39 @@ export default function BudgetDetailPage() {
               </Badge>
             </div>
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                aria-label={`Open actions for ${budget.name}`}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setBudgetDialogOpen(true)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleBudgetAlerts}>
+                {budget.alerts ? (
+                  <BellOff className="h-4 w-4 mr-2" />
+                ) : (
+                  <Bell className="h-4 w-4 mr-2" />
+                )}
+                {budget.alerts ? "Disable Alerts" : "Enable Alerts"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={deleteBudget}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -863,6 +1008,14 @@ export default function BudgetDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      <BudgetDialog
+        open={budgetDialogOpen}
+        onOpenChange={setBudgetDialogOpen}
+        budget={budget ? { ...budget, alerts: Boolean(budget.alerts) } : null}
+        categories={categories}
+        onSubmit={handleSaveBudget}
+      />
     </div>
   );
 }

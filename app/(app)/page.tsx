@@ -12,6 +12,7 @@ import {
   SpendingBreakdownCard,
   CashRunwayAlertCard,
   SmartRecommendationsCard,
+  type DashboardInsights,
 } from "@/components/dashboard/insights-card";
 import {
   Wallet,
@@ -20,17 +21,189 @@ import {
   PiggyBank,
   ArrowUpRight,
 } from "lucide-react";
+import * as LucideIcons from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { CardSkeleton } from "@/components/skeletons";
 import { ErrorState } from "@/components/states";
 import api from "@/lib/api";
+import { supabase } from "@/lib/supabase";
+import {
+  calculatePercentChange,
+  formatPercentChange,
+  getComparisonRange,
+  getTrendFromChange,
+  summarizeTransactions,
+  type TransactionLike,
+} from "@/lib/period-comparison";
 
 type DashboardSummary = {
   totalBalance: number;
   monthlyIncome: number;
   monthlyExpenses: number;
   savingsRate: number;
+};
+
+type TrendComparison = {
+  incomeChange: number | null;
+  expensesChange: number | null;
+  savingsRateChange: number | null;
+  label: string;
+};
+
+type SavingsGoal = {
+  id: string | number;
+  name: string;
+  current: number;
+  target: number;
+  icon?: LucideIcon;
+  color?: string;
+  autoSave?: boolean;
+};
+
+const formatCurrency = (value: number) =>
+  `${"\u20a6"}${value.toLocaleString("en-NG", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}`;
+
+const formatDashboardDate = (value?: string) => {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-NG", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+};
+
+const emptyInsights: DashboardInsights = {
+  categories: [],
+  metrics: {
+    totalSpending: 0,
+    monthlyIncome: 0,
+    remainingBalance: 0,
+    spendingRate: 0,
+    classification: "Not enough data",
+    classificationColor: "text-muted-foreground",
+    daysUntilRunout: null,
+  },
+  recommendations: [],
+};
+
+const resolveIcon = (iconName?: string) => {
+  if (!iconName) {
+    return LucideIcons.Tag;
+  }
+
+  const normalized = iconName
+    .trim()
+    .replace(/[-_ ]+/g, " ")
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join("");
+
+  const icons = LucideIcons as unknown as Record<string, LucideIcon>;
+
+  return icons[normalized] || LucideIcons.Tag;
+};
+
+const buildDashboardInsights = ({
+  transactions,
+  summary,
+}: {
+  transactions: any[];
+  summary: DashboardSummary;
+}): DashboardInsights => {
+  const categoryTotals = new Map<string, number>();
+  let expenses = 0;
+
+  transactions.forEach((transaction) => {
+    if (transaction.type !== "expense") {
+      return;
+    }
+
+    const amount = Number(transaction.amount ?? 0);
+    const category = transaction.categories?.name ?? "Uncategorized";
+    expenses += amount;
+    categoryTotals.set(category, (categoryTotals.get(category) ?? 0) + amount);
+  });
+
+  const totalSpending = summary.monthlyExpenses || expenses;
+  const monthlyIncome = summary.monthlyIncome;
+  const remainingBalance = summary.totalBalance;
+  const spendingRate =
+    monthlyIncome > 0 ? (totalSpending / monthlyIncome) * 100 : 0;
+  const dailySpending = totalSpending / 30;
+  const daysUntilRunout =
+    dailySpending > 0 ? Math.ceil(remainingBalance / dailySpending) : null;
+
+  let classification = "Not enough data";
+  let classificationColor = "text-muted-foreground";
+
+  if (monthlyIncome > 0 || totalSpending > 0) {
+    if (spendingRate > 70) {
+      classification = "High Spender";
+      classificationColor = "text-destructive";
+    } else if (spendingRate < 40) {
+      classification = "Cautious Spender";
+      classificationColor = "text-success";
+    } else {
+      classification = "Moderate Spender";
+      classificationColor = "text-blue-600";
+    }
+  }
+
+  const categories = Array.from(categoryTotals.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([label, value]) => ({
+      label,
+      value: formatCurrency(value),
+      percentage:
+        totalSpending > 0 ? Math.round((value / totalSpending) * 100) : 0,
+    }));
+
+  const topCategory = categories[0];
+  const recommendations = [
+    spendingRate > 70
+      ? "Your spending is above 70% of income this month. Review flexible categories before the month closes."
+      : monthlyIncome > 0
+        ? "Your spending is staying within a healthy range for the current month."
+        : "",
+    topCategory && topCategory.percentage > 40
+      ? `${topCategory.label} is ${topCategory.percentage}% of spending. A small cap here would have the biggest impact.`
+      : topCategory
+        ? `${topCategory.label} is your largest expense category this month. Keep an eye on it.`
+        : "",
+    summary.savingsRate < 20 && monthlyIncome > 0
+      ? "Consider moving a fixed amount into a savings goal after each income transaction."
+      : summary.savingsRate >= 20
+        ? `Nice savings rate this month: ${summary.savingsRate}%. Keep that rhythm going.`
+        : "",
+  ].filter(Boolean);
+
+  return {
+    categories,
+    metrics: {
+      totalSpending,
+      monthlyIncome,
+      remainingBalance,
+      spendingRate,
+      classification,
+      classificationColor,
+      daysUntilRunout,
+    },
+    recommendations,
+  };
 };
 
 export default function DashboardPage() {
@@ -46,12 +219,26 @@ export default function DashboardPage() {
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [cashflow, setCashflow] = useState<any[]>([]);
   const [budgets, setBudgets] = useState<any[]>([]);
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [firstName, setFirstName] = useState("");
+  const [dashboardInsights, setDashboardInsights] =
+    useState<DashboardInsights>(emptyInsights);
+  const [trendComparison, setTrendComparison] = useState<TrendComparison>({
+    incomeChange: null,
+    expensesChange: null,
+    savingsRateChange: null,
+    label: "vs last month",
+  });
 
   useEffect(() => {
     const loadDashboard = async () => {
       try {
         setHasError(false);
         setIsLoading(true);
+        const comparisonRange = getComparisonRange("this-month");
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
         const [
           summaryResponse,
@@ -59,6 +246,10 @@ export default function DashboardPage() {
           recentResponse,
           cashflowResponse,
           budgetsResponse,
+          savingsBucketsResponse,
+          currentTransactionsResponse,
+          previousTransactionsResponse,
+          profileResponse,
         ] = await Promise.all([
           api.get<DashboardSummary>("/dashboard/summary"),
           api.get<{ accounts: any[]; data?: any[] }>("/accounts"),
@@ -67,13 +258,83 @@ export default function DashboardPage() {
             query: { period: "12m" },
           }),
           api.get<{ budgets?: any[]; data?: any[] }>("/budgets"),
+          api.get<{ buckets: any[] }>("/savings-buckets"),
+          api.get<{ transactions: TransactionLike[] }>("/transactions", {
+            query: {
+              limit: 1000,
+              startDate: comparisonRange.start.toISOString(),
+              endDate: comparisonRange.end.toISOString(),
+            },
+          }),
+          api.get<{ transactions: TransactionLike[] }>("/transactions", {
+            query: {
+              limit: 1000,
+              startDate: comparisonRange.previousStart.toISOString(),
+              endDate: comparisonRange.previousEnd.toISOString(),
+            },
+          }),
+          user
+            ? supabase
+                .from("profiles")
+                .select("first_name, full_name")
+                .eq("user_id", user.id)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null }),
         ]);
+        const currentPeriod = summarizeTransactions(
+          currentTransactionsResponse.transactions ?? []
+        );
+        const previousPeriod = summarizeTransactions(
+          previousTransactionsResponse.transactions ?? []
+        );
 
         setSummary(summaryResponse);
         setAccounts(accountsResponse.accounts ?? accountsResponse.data ?? []);
         setRecentTransactions(recentResponse.transactions);
         setCashflow(cashflowResponse.cashflow);
         setBudgets(budgetsResponse.budgets ?? budgetsResponse.data ?? []);
+        setSavingsGoals(
+          (savingsBucketsResponse.buckets ?? []).slice(0, 3).map((bucket) => ({
+            id: bucket.id,
+            name: bucket.name,
+            current: Number(bucket.current ?? bucket.current_amount ?? 0),
+            target: Number(bucket.target ?? bucket.target_amount ?? 0),
+            icon: resolveIcon(bucket.icon),
+            color: bucket.color ?? "bg-primary/10 text-primary",
+            autoSave: Boolean(
+              bucket.autoSave?.enabled ??
+                bucket.auto_save_enabled ??
+                bucket.autosave_enabled,
+            ),
+          })),
+        );
+        setFirstName(
+          profileResponse.data?.first_name ??
+            String(profileResponse.data?.full_name ?? user?.user_metadata?.first_name ?? "")
+              .trim()
+              .split(" ")[0],
+        );
+        setDashboardInsights(
+          buildDashboardInsights({
+            transactions: currentTransactionsResponse.transactions ?? [],
+            summary: summaryResponse,
+          }),
+        );
+        setTrendComparison({
+          incomeChange: calculatePercentChange(
+            currentPeriod.income,
+            previousPeriod.income
+          ),
+          expensesChange: calculatePercentChange(
+            currentPeriod.expenses,
+            previousPeriod.expenses
+          ),
+          savingsRateChange: calculatePercentChange(
+            currentPeriod.savingsRate,
+            previousPeriod.savingsRate
+          ),
+          label: comparisonRange.label,
+        });
       } catch (error) {
         console.error(error);
         setHasError(true);
@@ -230,7 +491,7 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Good morning, John
+            Good morning{firstName ? `, ${firstName}` : ""}
           </h1>
           <p className="text-muted-foreground mt-1">
             {"Here's your financial overview for today"}
@@ -248,7 +509,7 @@ export default function DashboardPage() {
           title="Total Balance"
           value={summary.totalBalance}
           change="Across all accounts"
-          trend="up"
+          trend="neutral"
           icon={Wallet}
           iconColor="bg-primary/10 text-primary"
           isCurrency={true}
@@ -256,8 +517,11 @@ export default function DashboardPage() {
         <StatCard
           title="Monthly Income"
           value={summary.monthlyIncome}
-          change="Current period"
-          trend="up"
+          change={formatPercentChange(
+            trendComparison.incomeChange,
+            trendComparison.label
+          )}
+          trend={getTrendFromChange(trendComparison.incomeChange)}
           icon={TrendingUp}
           iconColor="bg-success/10 text-success"
           isCurrency={true}
@@ -265,8 +529,11 @@ export default function DashboardPage() {
         <StatCard
           title="Monthly Expenses"
           value={summary.monthlyExpenses}
-          change="Current period"
-          trend="down"
+          change={formatPercentChange(
+            trendComparison.expensesChange,
+            trendComparison.label
+          )}
+          trend={getTrendFromChange(trendComparison.expensesChange, true)}
           icon={TrendingDown}
           iconColor="bg-destructive/10 text-destructive"
           isCurrency={true}
@@ -274,8 +541,11 @@ export default function DashboardPage() {
         <StatCard
           title="Savings Rate"
           value={`${summary.savingsRate}%`}
-          change="Income after expenses"
-          trend="up"
+          change={formatPercentChange(
+            trendComparison.savingsRateChange,
+            trendComparison.label
+          )}
+          trend={getTrendFromChange(trendComparison.savingsRateChange)}
           icon={PiggyBank}
           iconColor="bg-chart-4/10 text-chart-4"
         />
@@ -291,21 +561,24 @@ export default function DashboardPage() {
               id: transaction.id,
               name: transaction.description,
               category: transaction.categories?.name ?? "Uncategorized",
+              icon: resolveIcon(transaction.categories?.icon),
               amount:
                 transaction.type === "income"
                   ? Number(transaction.amount)
                   : -Number(transaction.amount),
-              date: new Date(transaction.date).toLocaleDateString(),
+              date: formatDashboardDate(transaction.date),
               color: transaction.categories?.color,
             }))}
           />
-          <SpendingBreakdownCard />
-          <SmartRecommendationsCard />
+          <SpendingBreakdownCard categories={dashboardInsights.categories} />
+          <SmartRecommendationsCard
+            recommendations={dashboardInsights.recommendations}
+          />
         </div>
 
         {/* Right Column - Sidebar */}
         <div className="space-y-8">
-          <FinancialProfileCard />
+          <FinancialProfileCard metrics={dashboardInsights.metrics} />
           <AccountsCard
             accounts={accounts.map((account) => ({
               name: account.name,
@@ -320,8 +593,8 @@ export default function DashboardPage() {
               budget: Number(budget.budget ?? budget.amount ?? 0),
             }))}
           />
-          <SavingsGoals />
-          <CashRunwayAlertCard />
+          <SavingsGoals goals={savingsGoals} />
+          <CashRunwayAlertCard metrics={dashboardInsights.metrics} />
         </div>
       </div>
     </div>

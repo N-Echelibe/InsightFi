@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   PiggyBank,
   Settings,
+  Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -38,13 +39,18 @@ const primaryItems = [
     icon: PiggyBank,
   },
   {
-    title: "Insights",
-    href: "/insights",
-    icon: Lightbulb,
+    title: "Goals",
+    href: "/goals",
+    icon: Target,
   },
 ];
 
 const moreItems = [
+  {
+    title: "Insights",
+    href: "/insights",
+    icon: Lightbulb,
+  },
   {
     title: "Reports",
     href: "/reports",

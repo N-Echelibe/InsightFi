@@ -50,6 +50,15 @@ import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import axios from "axios";
 import { supabase } from "@/lib/supabase";
+import {
+  calculatePercentChange,
+  formatPercentChange,
+  getComparisonRange,
+  getTrendFromChange,
+  summarizeTransactions,
+  type ComparisonRange,
+  type TransactionLike,
+} from "@/lib/period-comparison";
 
 const monthlyData = [
   { month: "Jan", income: 6500, expenses: 4200, savings: 2300 },
@@ -119,6 +128,22 @@ const reportTypes = [
   },
 ];
 
+const reportRangeToComparisonRange: Record<string, ComparisonRange> = {
+  "1m": "last-30-days",
+  "3m": "last-3-months",
+  "6m": "last-6-months",
+  "12m": "last-12-months",
+  ytd: "year-to-date",
+};
+
+type TrendComparison = {
+  incomeChange: number | null;
+  expensesChange: number | null;
+  savingsChange: number | null;
+  savingsRateChange: number | null;
+  label: string;
+};
+
 export default function ReportsPage() {
   const [dateRange, setDateRange] = useState("12m");
   const [reportType, setReportType] = useState("spending");
@@ -132,18 +157,73 @@ export default function ReportsPage() {
   });
   const [monthlyBreakdown, setMonthlyBreakdown] = useState(monthlyData);
   const [categories, setCategories] = useState(categoryBreakdown);
+  const [trendComparison, setTrendComparison] = useState<TrendComparison>({
+    incomeChange: null,
+    expensesChange: null,
+    savingsChange: null,
+    savingsRateChange: null,
+    label: "vs previous period",
+  });
 
   useEffect(() => {
     const loadReports = async () => {
       try {
         setHasError(false);
         setIsLoading(true);
+        const comparisonRange = getComparisonRange(
+          reportRangeToComparisonRange[dateRange] ?? "last-12-months"
+        );
 
-        const response = await api.get<any>("/reports", {
-          query: { range: dateRange, type: reportType },
-        });
+        const [
+          response,
+          currentTransactionsResponse,
+          previousTransactionsResponse,
+        ] = await Promise.all([
+          api.get<any>("/reports", {
+            query: { range: dateRange, type: reportType },
+          }),
+          api.get<{ transactions: TransactionLike[] }>("/transactions", {
+            query: {
+              limit: 1000,
+              startDate: comparisonRange.start.toISOString(),
+              endDate: comparisonRange.end.toISOString(),
+            },
+          }),
+          api.get<{ transactions: TransactionLike[] }>("/transactions", {
+            query: {
+              limit: 1000,
+              startDate: comparisonRange.previousStart.toISOString(),
+              endDate: comparisonRange.previousEnd.toISOString(),
+            },
+          }),
+        ]);
+        const currentPeriod = summarizeTransactions(
+          currentTransactionsResponse.transactions ?? []
+        );
+        const previousPeriod = summarizeTransactions(
+          previousTransactionsResponse.transactions ?? []
+        );
 
         setSummary(response.summary);
+        setTrendComparison({
+          incomeChange: calculatePercentChange(
+            currentPeriod.income,
+            previousPeriod.income
+          ),
+          expensesChange: calculatePercentChange(
+            currentPeriod.expenses,
+            previousPeriod.expenses
+          ),
+          savingsChange: calculatePercentChange(
+            currentPeriod.savings,
+            previousPeriod.savings
+          ),
+          savingsRateChange: calculatePercentChange(
+            currentPeriod.savingsRate,
+            previousPeriod.savingsRate
+          ),
+          label: comparisonRange.label,
+        });
         setMonthlyBreakdown(
           (response.monthlyBreakdown ?? []).map((item: any) => ({
             month: item.label ?? item.month,
@@ -358,32 +438,44 @@ export default function ReportsPage() {
         <StatCard
           title="Total Income"
           value={`$${totalIncome.toLocaleString()}`}
-          change="+12% vs last year"
-          trend="up"
+          change={formatPercentChange(
+            trendComparison.incomeChange,
+            trendComparison.label
+          )}
+          trend={getTrendFromChange(trendComparison.incomeChange)}
           icon={DollarSign}
           iconColor="bg-success/10 text-success"
         />
         <StatCard
           title="Total Expenses"
           value={`$${totalExpenses.toLocaleString()}`}
-          change="+8% vs last year"
-          trend="down"
+          change={formatPercentChange(
+            trendComparison.expensesChange,
+            trendComparison.label
+          )}
+          trend={getTrendFromChange(trendComparison.expensesChange, true)}
           icon={TrendingDown}
           iconColor="bg-destructive/10 text-destructive"
         />
         <StatCard
           title="Total Savings"
           value={`$${totalSavings.toLocaleString()}`}
-          change="+18% vs last year"
-          trend="up"
+          change={formatPercentChange(
+            trendComparison.savingsChange,
+            trendComparison.label
+          )}
+          trend={getTrendFromChange(trendComparison.savingsChange)}
           icon={TrendingUp}
           iconColor="bg-primary/10 text-primary"
         />
         <StatCard
           title="Savings Rate"
           value={`${savingsRate}%`}
-          change="+3% vs last year"
-          trend="up"
+          change={formatPercentChange(
+            trendComparison.savingsRateChange,
+            trendComparison.label
+          )}
+          trend={getTrendFromChange(trendComparison.savingsRateChange)}
           icon={PieChartIcon}
           iconColor="bg-chart-4/10 text-chart-4"
         />

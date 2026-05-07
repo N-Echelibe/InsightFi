@@ -38,7 +38,7 @@ interface Budget {
   spent: number;
   budget: number;
   alerts: boolean;
-  type?: "weekly" | "monthly" | "yearly" | "onetime" | "custom";
+  type?: "daily" | "weekly" | "monthly" | "yearly" | "onetime" | "custom";
   startDate?: Date;
   endDate?: Date;
   createdDate?: Date;
@@ -73,7 +73,9 @@ export function BudgetDialog({
   const [amount, setAmount] = useState("");
   const [alertEnabled, setAlertEnabled] = useState(true);
   const [alertThreshold, setAlertThreshold] = useState([80]);
-  const [budgetType, setBudgetType] = useState<"weekly" | "monthly" | "yearly" | "onetime" | "custom">("monthly");
+  const [budgetType, setBudgetType] = useState<
+    "daily" | "weekly" | "monthly" | "yearly" | "onetime" | "custom"
+  >("monthly");
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
 
@@ -112,7 +114,7 @@ export function BudgetDialog({
         period: budgetType,
         start_date: isCustomRange && startDate ? startDate.toISOString() : undefined,
         end_date: isCustomRange && endDate ? endDate.toISOString() : undefined,
-        recurring: ["weekly", "monthly", "yearly"].includes(budgetType),
+        recurring: ["daily", "weekly", "monthly", "yearly"].includes(budgetType),
         alert: alertEnabled,
         alert_threshold: alertThreshold[0],
       });
@@ -160,17 +162,19 @@ export function BudgetDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="daily">Daily Recurring</SelectItem>
                 <SelectItem value="weekly">Weekly Recurring</SelectItem>
                 <SelectItem value="monthly">Monthly Recurring</SelectItem>
                 <SelectItem value="yearly">Yearly Recurring</SelectItem>
-                <SelectItem value="onetime">One-Time</SelectItem>
                 <SelectItem value="custom">Custom Range</SelectItem>
+                <SelectItem value="onetime">One-Time</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="grid gap-2">
             <Label htmlFor="amount">
+              {budgetType === "daily" && "Daily Budget"}
               {budgetType === "weekly" && "Weekly Budget"}
               {budgetType === "monthly" && "Monthly Budget"}
               {budgetType === "yearly" && "Yearly Budget"}

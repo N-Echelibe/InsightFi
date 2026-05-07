@@ -12,6 +12,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Target,
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,11 @@ const navItems = [
     title: "Budgets",
     href: "/budgets",
     icon: PiggyBank,
+  },
+  {
+    title: "Goals",
+    href: "/goals",
+    icon: Target,
   },
   {
     title: "Insights",
