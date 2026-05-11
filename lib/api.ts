@@ -1,8 +1,9 @@
-import axios, { AxiosError, AxiosRequestConfig } from "axios";
+import axios, { AxiosRequestConfig } from "axios";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import { request } from "http";
 
 const API_URL = process.env.NEXT_PUBLIC_API ?? "";
+let pendingSessionRequest: Promise<Session | null> | null = null;
 
 type RequestOptions = Omit<AxiosRequestConfig, "auth"> & {
   auth?: boolean;
@@ -33,6 +34,33 @@ const headersToObject = (headers?: RequestOptions["headers"]) => {
   return result;
 };
 
+export const getSupabaseSession = async () => {
+  pendingSessionRequest ??= supabase.auth
+    .getSession()
+    .then(({ data, error }) => {
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return data.session;
+    })
+    .finally(() => {
+      pendingSessionRequest = null;
+    });
+
+  return pendingSessionRequest;
+};
+
+export const getSupabaseAccessToken = async () => {
+  const session = await getSupabaseSession();
+
+  if (!session?.access_token) {
+    throw new Error("You need to sign in first.");
+  }
+
+  return session.access_token;
+};
+
 export async function apiRequest<T>(
   path: string,
   { auth = true, query, headers, body, ...options }: RequestOptions = {},
@@ -46,30 +74,14 @@ export async function apiRequest<T>(
 
     if (auth) {
       try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-
-        if (error) {
-          throw new Error(error.message);
-        }
-
-        if (!session?.access_token) {
-          throw new Error("You need to sign in first.");
-        }
-
-        requestHeaders["Authorization"] = `Bearer ${session.access_token}`;
+        const accessToken = await getSupabaseAccessToken();
+        requestHeaders["Authorization"] = `Bearer ${accessToken}`;
       } catch (authError) {
         throw authError instanceof Error ? authError : new Error("Authentication failed");
       }
     }
 
     try {
-      console.log(requestHeaders);
-      console.log(body);
-      console.log(options);
-      console.log(buildUrl(path, query));
       const response = await axios.request<T>({
         url: buildUrl(path, query),
         method: options.method ?? "GET",

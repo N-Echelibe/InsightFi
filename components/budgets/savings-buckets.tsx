@@ -44,6 +44,7 @@ import {
   Edit,
   MoreHorizontal,
   Trash2,
+  HandCoins,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -68,11 +69,21 @@ type SavingsBucket = {
     enabled: boolean;
     amount: number;
     frequency: string;
+    accountId?: string | null;
+    lastRunAt?: string | null;
   };
   alerts: boolean;
 };
 
-type AutoSaveFrequency = "weekly" | "monthly";
+type Account = {
+  id: string;
+  name: string;
+  type?: string;
+  currency?: string;
+  balance: number;
+};
+
+type AutoSaveFrequency = "daily" | "weekly" | "monthly";
 
 const formatCurrency = (value: number) =>
   `${"\u20a6"}${value.toLocaleString("en-NG", {
@@ -91,7 +102,12 @@ const parseTargetDate = (value: string) => {
 
 const normalizeAutoSave = (
   bucket: any,
-  fallback = { enabled: false, amount: 0, frequency: "monthly" }
+  fallback: {
+    enabled: boolean;
+    amount: number;
+    frequency: string;
+    accountId?: string | null;
+  } = { enabled: false, amount: 0, frequency: "monthly", accountId: null }
 ) => ({
   enabled: Boolean(
     bucket.autoSave?.enabled ??
@@ -111,13 +127,37 @@ const normalizeAutoSave = (
       bucket.autosave_frequency ??
       fallback.frequency
   ),
+  lastRunAt:
+    bucket.autoSave?.lastRunAt ??
+    bucket.last_auto_save_at ??
+    bucket.lastAutoSaveAt ??
+    null,
+  accountId:
+    bucket.autoSave?.accountId ??
+    bucket.auto_save_account_id ??
+    bucket.autoSaveAccountId ??
+    fallback.accountId ??
+    null,
 });
 
 const getMonthlyAutoSaveAmount = (bucket: SavingsBucket) => {
   if (!bucket.autoSave.enabled) return 0;
-  return bucket.autoSave.frequency === "weekly"
-    ? bucket.autoSave.amount * 4
-    : bucket.autoSave.amount;
+  if (bucket.autoSave.frequency === "daily") {
+    return bucket.autoSave.amount * 30;
+  }
+
+  if (bucket.autoSave.frequency === "weekly") {
+    return bucket.autoSave.amount * 4;
+  }
+
+  return bucket.autoSave.amount;
+};
+
+const getAutoSaveFrequencyLabel = (frequency: string) => {
+  if (frequency === "daily") return "day";
+  if (frequency === "weekly") return "week";
+  if (frequency === "yearly") return "year";
+  return "month";
 };
 
 const calculateAutoSavePlan = ({
@@ -153,7 +193,9 @@ const calculateAutoSavePlan = ({
     Math.ceil((normalizedTargetDate.getTime() - today.getTime()) / dayMs)
   );
   const periods =
-    frequency === "weekly"
+    frequency === "daily"
+      ? Math.max(1, daysRemaining)
+      : frequency === "weekly"
       ? Math.max(1, Math.ceil(daysRemaining / 7))
       : Math.max(1, Math.ceil(daysRemaining / 30));
 
@@ -219,9 +261,11 @@ function SavingsBucketsSkeleton() {
 
 export function SavingsBuckets() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [allocateDialogOpen, setAllocateDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [selectedBucket, setSelectedBucket] = useState<SavingsBucket | null>(null);
   const [savingsBuckets, setSavingsBuckets] = useState<SavingsBucket[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newBucketName, setNewBucketName] = useState("");
   const [newBucketTarget, setNewBucketTarget] = useState("");
@@ -229,9 +273,13 @@ export function SavingsBuckets() {
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
   const [autoSaveFrequency, setAutoSaveFrequency] =
     useState<AutoSaveFrequency>("monthly");
+  const [autoSaveAccountId, setAutoSaveAccountId] = useState("");
   const [transferFrom, setTransferFrom] = useState("");
   const [transferTo, setTransferTo] = useState("");
   const [transferAmount, setTransferAmount] = useState("");
+  const [allocationBucketId, setAllocationBucketId] = useState("");
+  const [allocationAccountId, setAllocationAccountId] = useState("");
+  const [allocationAmount, setAllocationAmount] = useState("");
 
   const resetBucketForm = () => {
     setSelectedBucket(null);
@@ -240,6 +288,7 @@ export function SavingsBuckets() {
     setNewBucketDate(null);
     setAutoSaveEnabled(false);
     setAutoSaveFrequency("monthly");
+    setAutoSaveAccountId("");
   };
 
   useEffect(() => {
@@ -253,11 +302,13 @@ export function SavingsBuckets() {
       target: Shield,
     };
 
-    api
-      .get<{ buckets: any[] }>("/savings-buckets")
-      .then((response) => {
+    Promise.all([
+      api.get<{ buckets: any[] }>("/savings-buckets"),
+      api.get<{ accounts: Account[]; data?: Account[] }>("/accounts"),
+    ])
+      .then(([bucketResponse, accountResponse]) => {
         setSavingsBuckets(
-          response.buckets.map((bucket) => ({
+          bucketResponse.buckets.map((bucket) => ({
             id: bucket.id,
             name: bucket.name,
             current: Number(bucket.current ?? bucket.current_amount ?? 0),
@@ -267,6 +318,12 @@ export function SavingsBuckets() {
             color: bucket.color ?? "bg-primary/10 text-primary",
             autoSave: normalizeAutoSave(bucket),
             alerts: Boolean(bucket.alerts),
+          })),
+        );
+        setAccounts(
+          (accountResponse.accounts ?? accountResponse.data ?? []).map((account) => ({
+            ...account,
+            balance: Number(account.balance ?? 0),
           })),
         );
       })
@@ -286,8 +343,12 @@ export function SavingsBuckets() {
     setNewBucketDate(parseTargetDate(bucket.deadline));
     setAutoSaveEnabled(bucket.autoSave.enabled);
     setAutoSaveFrequency(
-      bucket.autoSave.frequency === "weekly" ? "weekly" : "monthly"
+      bucket.autoSave.frequency === "daily" ||
+        bucket.autoSave.frequency === "weekly"
+        ? bucket.autoSave.frequency
+        : "monthly"
     );
+    setAutoSaveAccountId(bucket.autoSave.accountId ?? "");
     setDialogOpen(true);
   };
 
@@ -298,9 +359,16 @@ export function SavingsBuckets() {
     setTransferDialogOpen(true);
   };
 
+  const openAllocateDialog = (bucket?: SavingsBucket) => {
+    setAllocationBucketId(bucket ? String(bucket.id) : "");
+    setAllocationAccountId("");
+    setAllocationAmount("");
+    setAllocateDialogOpen(true);
+  };
+
   const saveBucket = async () => {
     if (!newBucketName.trim() || !newBucketTarget) return;
-    if (autoSaveEnabled && !newBucketDate) return;
+    if (autoSaveEnabled && (!newBucketDate || !autoSaveAccountId)) return;
 
     const autoSavePlan = calculateAutoSavePlan({
       targetAmount: Number(newBucketTarget),
@@ -316,10 +384,12 @@ export function SavingsBuckets() {
       auto_save_enabled: autoSaveEnabled,
       auto_save_amount: autoSaveEnabled ? autoSavePlan.amount : 0,
       auto_save_frequency: autoSaveFrequency,
+      auto_save_account_id: autoSaveEnabled ? autoSaveAccountId : null,
       autoSave: {
         enabled: autoSaveEnabled,
         amount: autoSaveEnabled ? autoSavePlan.amount : 0,
         frequency: autoSaveFrequency,
+        accountId: autoSaveEnabled ? autoSaveAccountId : null,
       },
     };
 
@@ -402,6 +472,64 @@ export function SavingsBuckets() {
     setTransferAmount("");
   };
 
+  const allocateFundsToBucket = async () => {
+    if (!allocationBucketId || !allocationAccountId || !allocationAmount) return;
+
+    const bucket = savingsBuckets.find(
+      (item) => String(item.id) === allocationBucketId
+    );
+    const account = accounts.find((item) => item.id === allocationAccountId);
+    const amount = Number(allocationAmount);
+
+    if (!bucket || !account || !Number.isFinite(amount) || amount <= 0) return;
+
+    if (bucket.current >= bucket.target) return;
+
+    const allocation = Math.min(amount, bucket.target - bucket.current);
+    if (account.balance < allocation) return;
+
+    const response = await api.post<{ bucket?: any }>(
+      `/savings-buckets/${bucket.id}/allocate`,
+      {
+        amount,
+        account_id: allocationAccountId,
+      }
+    );
+    const updated = response.bucket;
+    const updatedAccount = (response as { account?: Account }).account;
+
+    setSavingsBuckets((items) =>
+      items.map((item) =>
+        item.id === bucket.id
+          ? {
+              ...item,
+              current: Number(
+                updated?.current ??
+                  updated?.current_amount ??
+                  Math.min(bucket.current + amount, bucket.target)
+              ),
+            }
+          : item
+      )
+    );
+    setAccounts((items) =>
+      items.map((item) =>
+        item.id === allocationAccountId
+          ? {
+              ...item,
+              balance: Number(
+                updatedAccount?.balance ?? item.balance - allocation
+              ),
+            }
+          : item
+      )
+    );
+    setAllocateDialogOpen(false);
+    setAllocationBucketId("");
+    setAllocationAccountId("");
+    setAllocationAmount("");
+  };
+
   const toggleBucketAlerts = async (bucket: SavingsBucket) => {
     const nextAlerts = !bucket.alerts;
 
@@ -441,6 +569,35 @@ export function SavingsBuckets() {
     targetDate: newBucketDate,
     frequency: autoSaveFrequency,
   });
+  const selectedAutoSaveAccount = accounts.find(
+    (account) => account.id === autoSaveAccountId
+  );
+  const selectedAllocationBucket = savingsBuckets.find(
+    (item) => String(item.id) === allocationBucketId
+  );
+  const selectedAllocationAccount = accounts.find(
+    (item) => item.id === allocationAccountId
+  );
+  const allocationInputAmount = Number(allocationAmount || 0);
+  const allocationAppliedAmount = selectedAllocationBucket
+    ? Math.min(
+        Math.max(allocationInputAmount, 0),
+        Math.max(selectedAllocationBucket.target - selectedAllocationBucket.current, 0)
+      )
+    : 0;
+  const hasInsufficientAllocationFunds =
+    Boolean(selectedAllocationAccount) &&
+    allocationAppliedAmount > 0 &&
+    Number(selectedAllocationAccount?.balance ?? 0) < allocationAppliedAmount;
+  const canAllocateFunds =
+    Boolean(selectedAllocationBucket) &&
+    Boolean(selectedAllocationAccount) &&
+    allocationAppliedAmount > 0 &&
+    !hasInsufficientAllocationFunds;
+  const canSaveBucket =
+    Boolean(newBucketName.trim()) &&
+    Boolean(newBucketTarget) &&
+    (!autoSaveEnabled || (Boolean(newBucketDate) && Boolean(autoSaveAccountId)));
 
   if (isLoading) {
     return <SavingsBucketsSkeleton />;
@@ -473,7 +630,7 @@ export function SavingsBuckets() {
         <Card>
           <CardContent className="p-5">
             <p className="text-sm font-medium text-muted-foreground">
-              Monthly Auto-Save
+              Est. Monthly Auto-Save
             </p>
             <p className="text-2xl font-bold">
               {formatCurrency(
@@ -495,6 +652,15 @@ export function SavingsBuckets() {
         <Button
           variant="outline"
           className="gap-2 bg-transparent"
+          onClick={() => openAllocateDialog()}
+          disabled={savingsBuckets.length === 0 || accounts.length === 0}
+        >
+          <HandCoins className="h-4 w-4" />
+          Add Funds
+        </Button>
+        <Button
+          variant="outline"
+          className="gap-2 bg-transparent"
           onClick={() => openTransferDialog()}
         >
           <ArrowRightLeft className="h-4 w-4" />
@@ -509,6 +675,9 @@ export function SavingsBuckets() {
             bucket.target > 0
               ? Math.round((bucket.current / bucket.target) * 100)
               : 0;
+          const autoSaveAccount = accounts.find(
+            (account) => account.id === bucket.autoSave.accountId
+          );
 
           return (
             <Card key={bucket.id} className="hover:shadow-md transition-shadow">
@@ -535,6 +704,13 @@ export function SavingsBuckets() {
                       <DropdownMenuItem onClick={() => openEditDialog(bucket)}>
                         <Edit className="h-4 w-4 mr-2" />
                         Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => openAllocateDialog(bucket)}
+                        disabled={accounts.length === 0}
+                      >
+                        <HandCoins className="h-4 w-4 mr-2" />
+                        Add Funds
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => openTransferDialog(bucket)}>
                         <ArrowRightLeft className="h-4 w-4 mr-2" />
@@ -583,8 +759,9 @@ export function SavingsBuckets() {
                         </Badge>
                         <span className="text-xs text-muted-foreground">
                           {`${formatCurrency(bucket.autoSave.amount)}/${
-                            bucket.autoSave.frequency === "weekly" ? "week" : "month"
+                            getAutoSaveFrequencyLabel(bucket.autoSave.frequency)
                           }`}
+                          {autoSaveAccount ? ` from ${autoSaveAccount.name}` : ""}
                         </span>
                       </>
                     ) : (
@@ -675,18 +852,40 @@ export function SavingsBuckets() {
               <div>
                 <Label>Enable Auto-Save</Label>
                 <p className="text-xs text-muted-foreground">
-                  Automatically move money into this goal.
+                  {accounts.length > 0
+                    ? "Automatically move money from an account into this goal."
+                    : "Add an account before enabling auto-save."}
                 </p>
               </div>
               <Switch
                 checked={autoSaveEnabled}
                 onCheckedChange={setAutoSaveEnabled}
+                disabled={accounts.length === 0}
               />
             </div>
 
             {autoSaveEnabled && (
               <div className="space-y-4 rounded-lg border bg-muted/20 p-3">
                 <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-2 sm:col-span-2">
+                    <Label>From Account</Label>
+                    <Select
+                      value={autoSaveAccountId}
+                      onValueChange={setAutoSaveAccountId}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.name} ({formatCurrency(account.balance)})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="grid gap-2">
                     <Label>Calculated Save Amount</Label>
                     <div className="flex h-10 items-center rounded-md border bg-background px-3 text-sm font-medium">
@@ -708,6 +907,7 @@ export function SavingsBuckets() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
                         <SelectItem value="weekly">Weekly</SelectItem>
                         <SelectItem value="monthly">Monthly</SelectItem>
                       </SelectContent>
@@ -720,6 +920,8 @@ export function SavingsBuckets() {
                   <p className="mt-1 text-muted-foreground">
                     {!newBucketTarget
                       ? "Enter a target amount to calculate your auto-save plan."
+                      : !autoSaveAccountId
+                        ? "Select the account that will fund this goal."
                       : !newBucketDate
                         ? "Select a target date to calculate your auto-save amount."
                         : autoSavePlan.remainingAmount <= 0
@@ -727,7 +929,9 @@ export function SavingsBuckets() {
                           : `${formatCurrency(
                               autoSavePlan.amount
                             )} every ${
-                              autoSaveFrequency === "weekly" ? "week" : "month"
+                              getAutoSaveFrequencyLabel(autoSaveFrequency)
+                            } from ${
+                              selectedAutoSaveAccount?.name ?? "the selected account"
                             } for ${autoSavePlan.periods} ${
                               autoSavePlan.periods === 1 ? "period" : "periods"
                             } to cover ${formatCurrency(
@@ -748,8 +952,121 @@ export function SavingsBuckets() {
             >
               Cancel
             </Button>
-            <Button onClick={saveBucket}>
+            <Button onClick={saveBucket} disabled={!canSaveBucket}>
               {selectedBucket ? "Update Goal" : "Create Goal"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Funds Dialog */}
+      <Dialog
+        open={allocateDialogOpen}
+        onOpenChange={(open) => {
+          setAllocateDialogOpen(open);
+          if (!open) {
+            setAllocationBucketId("");
+            setAllocationAccountId("");
+            setAllocationAmount("");
+          }
+        }}
+      >
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Funds to Goal</DialogTitle>
+            <DialogDescription>
+              Manually allocate money you have saved toward a specific goal.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Goal</Label>
+              <Select
+                value={allocationBucketId}
+                onValueChange={setAllocationBucketId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select goal" />
+                </SelectTrigger>
+                <SelectContent>
+                  {savingsBuckets.map((bucket) => (
+                    <SelectItem key={bucket.id} value={String(bucket.id)}>
+                      {bucket.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>From Account</Label>
+              <Select
+                value={allocationAccountId}
+                onValueChange={setAllocationAccountId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name} ({formatCurrency(account.balance)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Amount</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  {"\u20a6"}
+                </span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="pl-7"
+                  value={allocationAmount}
+                  onChange={(event) => setAllocationAmount(event.target.value)}
+                />
+              </div>
+            </div>
+            {selectedAllocationBucket && (
+              <div className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
+                <p>
+                  {selectedAllocationBucket.name} will move from{" "}
+                  {formatCurrency(selectedAllocationBucket.current)} to{" "}
+                  {formatCurrency(
+                    selectedAllocationBucket.current + allocationAppliedAmount
+                  )}{" "}
+                  of {formatCurrency(selectedAllocationBucket.target)}.
+                </p>
+                {selectedAllocationAccount && allocationAppliedAmount > 0 && (
+                  <p className="mt-1">
+                    {selectedAllocationAccount.name} balance after allocation:{" "}
+                    {formatCurrency(
+                      selectedAllocationAccount.balance - allocationAppliedAmount
+                    )}
+                  </p>
+                )}
+                {hasInsufficientAllocationFunds && (
+                  <p className="mt-1 text-destructive">
+                    This account does not have enough available balance.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="sm:[&>button]:w-auto [&>button]:w-full">
+            <Button
+              variant="outline"
+              onClick={() => setAllocateDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={allocateFundsToBucket} disabled={!canAllocateFunds}>
+              Add Funds
             </Button>
           </DialogFooter>
         </DialogContent>

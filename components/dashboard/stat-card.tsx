@@ -51,7 +51,7 @@ export function StatCard({
                 )}
                 <span
                   className={cn(
-                    "truncate text-xs font-medium",
+                    "text-xs font-medium leading-snug",
                     trend === "up" && "text-success",
                     trend === "down" && "text-destructive",
                     trend === "neutral" && "text-muted-foreground",

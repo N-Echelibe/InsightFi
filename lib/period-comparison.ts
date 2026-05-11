@@ -8,6 +8,7 @@ export type ComparisonRange =
 
 export type TransactionLike = {
   amount?: number | string | null;
+  fee_amount?: number | string | null;
   type?: string | null;
   date?: string | null;
 };
@@ -82,11 +83,12 @@ export function summarizeTransactions(transactions: TransactionLike[]): PeriodSu
   const summary = transactions.reduce(
     (total, transaction) => {
       const amount = Number(transaction.amount ?? 0);
+      const feeAmount = Math.max(Number(transaction.fee_amount ?? 0), 0);
 
       if (transaction.type === "income") {
-        total.income += amount;
+        total.income += Math.max(amount - feeAmount, 0);
       } else if (transaction.type === "expense") {
-        total.expenses += amount;
+        total.expenses += amount + feeAmount;
       }
 
       return total;

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,9 +48,8 @@ import {
   CalendarIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import api from "@/lib/api";
+import api, { getSupabaseAccessToken } from "@/lib/api";
 import axios from "axios";
-import { supabase } from "@/lib/supabase";
 import {
   createAccountTransfer,
   type AccountTransferInput,
@@ -62,6 +62,8 @@ type Transaction = {
   id: string;
   description: string;
   amount: number;
+  fee_amount?: number;
+  payment_method?: string;
   type: "income" | "expense" | string;
   category_id?: string;
   date: string;
@@ -87,6 +89,15 @@ type Category = {
   id: string;
   name: string;
   type?: string;
+};
+
+const paymentMethodLabels: Record<string, string> = {
+  cash: "Cash",
+  bank_transfer: "Bank Transfer",
+  pos: "POS",
+  card: "Card",
+  mobile_banking: "Mobile Banking",
+  other: "Other",
 };
 
 const sampleTransactions: Transaction[] = [
@@ -252,8 +263,11 @@ const sampleTransactions: Transaction[] = [
   },
 ];
 
-export default function TransactionsPage() {
+function TransactionsContent() {
+  const searchParams = useSearchParams();
+  const urlSearchQuery = searchParams.get("search") ?? "";
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -265,7 +279,8 @@ export default function TransactionsPage() {
     total: 0,
     pages: 1,
   });
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(urlSearchQuery);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
   const [customDateStart, setCustomDateStart] = useState<Date | null>(null);
@@ -273,8 +288,25 @@ export default function TransactionsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const itemsPerPage = 8;
+  const isInitialLoading = isLoading && !hasLoadedOnce;
 
   useEffect(() => {
+    setSearchQuery(urlSearchQuery);
+    setDebouncedSearchQuery(urlSearchQuery);
+    setCurrentPage(1);
+  }, [urlSearchQuery]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    let active = true;
+
     const loadTransactions = async () => {
       try {
         setHasError(false);
@@ -319,7 +351,7 @@ export default function TransactionsPage() {
               query: {
                 page: currentPage,
                 limit: itemsPerPage,
-                search: searchQuery.trim(),
+                search: debouncedSearchQuery.trim(),
                 category_id: categoryFilter === "all" ? undefined : categoryFilter,
                 ...getDateQuery(),
               },
@@ -328,27 +360,42 @@ export default function TransactionsPage() {
             api.get<{ categories: Category[] }>("/categories"),
           ]);
 
+        if (!active) {
+          return;
+        }
+
         setTransactions(transactionsResponse.transactions);
         setPagination(transactionsResponse.pagination);
         setAccounts(accountsResponse.accounts ?? accountsResponse.data ?? []);
         setCategories(categoriesResponse.categories);
+        setHasLoadedOnce(true);
       } catch (error) {
+        if (!active) {
+          return;
+        }
+
         console.error(error);
         setHasError(true);
       } finally {
-        setIsLoading(false);
+        if (active) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadTransactions();
+
+    return () => {
+      active = false;
+    };
   }, [
     categoryFilter,
     customDateEnd,
     customDateStart,
     currentPage,
     dateFilter,
+    debouncedSearchQuery,
     reloadTick,
-    searchQuery,
   ]);
 
   const resolveIcon = (iconName?: string) => {
@@ -383,6 +430,8 @@ export default function TransactionsPage() {
   const handleCreateTransaction = async (transaction: {
     account_id: string;
     amount: number;
+    fee_amount?: number;
+    payment_method: string;
     type: "expense" | "income";
     category_id: string;
     description: string;
@@ -403,12 +452,10 @@ export default function TransactionsPage() {
   };
 
   const handleExport = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const accessToken = await getSupabaseAccessToken();
     const response = await axios.get(`${process.env.NEXT_PUBLIC_API}/transactions/export?format=csv`, {
       headers: {
-        Authorization: `Bearer ${session?.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       responseType: "blob",
     });
@@ -421,7 +468,7 @@ export default function TransactionsPage() {
     URL.revokeObjectURL(url);
   };
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return <Loading />;
   }
 
@@ -586,6 +633,7 @@ export default function TransactionsPage() {
                   <TableHead>Transaction</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Account</TableHead>
+                  <TableHead>Payment</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
@@ -593,9 +641,31 @@ export default function TransactionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedTransactions.length === 0 ? (
+                {isLoading ? (
+                  Array.from({ length: itemsPerPage }).map((_, rowIndex) => (
+                    <TableRow key={`transaction-skeleton-${rowIndex}`}>
+                      {Array.from({ length: 8 }).map((__, cellIndex) => (
+                        <TableCell key={cellIndex}>
+                          <div
+                            className={cn(
+                              "h-4 animate-pulse rounded-md bg-muted",
+                              cellIndex === 0 && "w-40",
+                              cellIndex === 1 && "w-24",
+                              cellIndex === 2 && "w-28",
+                              cellIndex === 3 && "w-24",
+                              cellIndex === 4 && "w-24",
+                              cellIndex === 5 && "w-20",
+                              cellIndex === 6 && "ml-auto w-24",
+                              cellIndex === 7 && "w-8",
+                            )}
+                          />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : paginatedTransactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={8}>
                       <EmptyState
                         title="No transactions yet"
                         description="Start tracking your finances by adding your first transaction."
@@ -610,10 +680,11 @@ export default function TransactionsPage() {
                 ) : (
                   paginatedTransactions.map((transaction) => {
                   const Icon = resolveIcon(transaction.categories?.icon);
+                  const feeAmount = Number(transaction.fee_amount ?? 0);
                   const effectiveAmount =
                     transaction.type === "expense"
-                      ? -Math.abs(transaction.amount)
-                      : Math.abs(transaction.amount);
+                      ? -(Math.abs(transaction.amount) + feeAmount)
+                      : Math.max(Math.abs(transaction.amount) - feeAmount, 0);
 
                   return (
                     <TableRow key={transaction.id}>
@@ -632,6 +703,18 @@ export default function TransactionsPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {transaction.accounts?.name || "Unknown"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <Badge variant="outline" className="font-normal">
+                            {paymentMethodLabels[transaction.payment_method ?? "cash"] ?? "Other"}
+                          </Badge>
+                          {feeAmount > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Fee: ₦{feeAmount.toLocaleString("en-NG")}
+                            </p>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {new Date(transaction.date).toLocaleDateString("en-US", {
@@ -749,5 +832,13 @@ export default function TransactionsPage() {
         onTransferSubmit={handleCreateTransfer}
       />
     </div>
+  );
+}
+
+export default function TransactionsPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <TransactionsContent />
+    </Suspense>
   );
 }

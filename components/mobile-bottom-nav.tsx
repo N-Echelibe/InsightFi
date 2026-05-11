@@ -11,6 +11,7 @@ import {
   PiggyBank,
   Settings,
   Target,
+  WalletCards,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -39,13 +40,18 @@ const primaryItems = [
     icon: PiggyBank,
   },
   {
-    title: "Goals",
-    href: "/goals",
-    icon: Target,
+    title: "Allowance",
+    href: "/allowance",
+    icon: WalletCards,
   },
 ];
 
 const moreItems = [
+  {
+    title: "Goals",
+    href: "/goals",
+    icon: Target,
+  },
   {
     title: "Insights",
     href: "/insights",

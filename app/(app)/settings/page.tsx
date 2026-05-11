@@ -385,6 +385,7 @@ function ToggleRow({
 
 export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -609,6 +610,7 @@ export default function SettingsPage() {
           qrCode: null,
           verificationCode: "",
         }));
+        setHasLoadedOnce(true);
       } catch (error) {
         console.error(error);
         setHasError(true);
@@ -1091,7 +1093,8 @@ export default function SettingsPage() {
     try {
       const { data, error } = await (supabase.auth.mfa as any).enroll({
         factorType: "totp",
-        friendlyName: "InsightFi",
+        issuer: "InsightFi",
+        friendlyName: authEmail || profileForm.email || "InsightFi account",
       });
 
       if (error) {
@@ -1235,7 +1238,7 @@ export default function SettingsPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !hasLoadedOnce) {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1429,7 +1432,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="avatarUrl">Profile photo URL</Label>
-                    <div className="relative">
+                    <div className="relative" style={{width: "50%"}}>
                       <Camera className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         id="avatarUrl"

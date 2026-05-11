@@ -48,7 +48,7 @@ type BudgetItem = {
   budget: number;
   icon: LucideIcon;
   alerts: boolean;
-  type: "daily" | "weekly" | "monthly" | "yearly" | "custom" | "onetime";
+  type: "daily" | "weekly" | "monthly" | "yearly" | "semester_1" | "semester_2" | "academic_period" | "custom" | "onetime";
   createdDate?: Date;
   startDate?: Date;
   endDate?: Date;
@@ -155,6 +155,9 @@ const budgetTypeLabels: Record<BudgetItem["type"], string> = {
   daily: "Daily",
   weekly: "Weekly",
   monthly: "Monthly",
+  semester_1: "First Semester",
+  semester_2: "Second Semester",
+  academic_period: "Academic Period",
   yearly: "Yearly",
   custom: "Custom Range",
   onetime: "One-Time",
@@ -332,6 +335,7 @@ export default function BudgetsPage() {
   const [budgets, setBudgets] = useState<BudgetItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
 
@@ -378,6 +382,7 @@ export default function BudgetsPage() {
 
         setBudgets(normalized);
         setCategories(categoriesResponse.categories);
+        setHasLoadedOnce(true);
       } catch (error) {
         console.error(error);
         setHasError(true);
@@ -473,7 +478,7 @@ export default function BudgetsPage() {
     setBudgets((items) => items.filter((item) => item.id !== budget.id));
   };
 
-  if (isLoading) {
+  if (isLoading && !hasLoadedOnce) {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

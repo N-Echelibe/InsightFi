@@ -43,6 +43,8 @@ interface AddTransactionDialogProps {
   onSubmit: (transaction: {
     account_id: string;
     amount: number;
+    fee_amount?: number;
+    payment_method: string;
     type: "expense" | "income";
     category_id: string;
     description: string;
@@ -74,6 +76,8 @@ export function AddTransactionDialog({
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [account, setAccount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [feeAmount, setFeeAmount] = useState("");
   const [transferFrom, setTransferFrom] = useState("");
   const [transferTo, setTransferTo] = useState("");
 
@@ -102,6 +106,8 @@ export function AddTransactionDialog({
     setName("");
     setCategory("");
     setAccount("");
+    setPaymentMethod("cash");
+    setFeeAmount("");
     setTransferFrom("");
     setTransferTo("");
     setType("expense");
@@ -132,8 +138,15 @@ export function AddTransactionDialog({
 
   const handleSubmit = async () => {
     const parsedAmount = Number(amount);
+    const parsedFeeAmount = Number(feeAmount || 0);
 
-    if (Number.isNaN(parsedAmount) || parsedAmount <= 0 || !name.trim()) {
+    if (
+      Number.isNaN(parsedAmount) ||
+      parsedAmount <= 0 ||
+      Number.isNaN(parsedFeeAmount) ||
+      parsedFeeAmount < 0 ||
+      !name.trim()
+    ) {
       return;
     }
 
@@ -163,6 +176,8 @@ export function AddTransactionDialog({
       await onSubmit({
         account_id: account,
         amount: parsedAmount,
+        fee_amount: parsedFeeAmount,
+        payment_method: paymentMethod,
         type,
         category_id: category,
         description: name.trim(),
@@ -224,7 +239,7 @@ export function AddTransactionDialog({
             <Label htmlFor="amount">Amount</Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                $
+                {"\u20a6"}
               </span>
               <Input
                 id="amount"
@@ -283,6 +298,42 @@ export function AddTransactionDialog({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Payment Method</Label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="pos">POS</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="mobile_banking">Mobile Banking</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="feeAmount">Fees/Charges</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    {"\u20a6"}
+                  </span>
+                  <Input
+                    id="feeAmount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={feeAmount}
+                    onChange={(e) => setFeeAmount(e.target.value)}
+                    className="pl-7"
+                  />
+                </div>
               </div>
             </>
           ) : (

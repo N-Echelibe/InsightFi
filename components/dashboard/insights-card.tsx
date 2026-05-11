@@ -17,6 +17,13 @@ export type DashboardInsightMetrics = {
   spendingRate: number;
   classification: string;
   classificationColor: string;
+  classificationDescription: string;
+  classificationBenchmark: string;
+  classificationScore: number | null;
+  classificationReasons: string[];
+  classificationNextAction: string;
+  safeSpendPerDay: number | null;
+  safeSpendRemaining: number | null;
   daysUntilRunout: number | null;
 };
 
@@ -34,28 +41,66 @@ export function FinancialProfileCard({
 }: {
   metrics: DashboardInsightMetrics;
 }) {
+  const savingsRate =
+    metrics.monthlyIncome > 0
+      ? ((metrics.monthlyIncome - metrics.totalSpending) /
+          metrics.monthlyIncome) *
+        100
+      : 0;
+
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg font-semibold">
           <TrendingUp className="h-4 w-4" />
-          Financial Profile
+          Budget Survival Score
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="rounded-lg bg-muted/40 p-3">
-          <p className="mb-1 text-xs font-medium text-muted-foreground">
-            Spending Classification
-          </p>
-          <p className={cn("text-lg font-bold", metrics.classificationColor)}>
+        <div className="rounded-lg bg-muted/40 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              Current Status
+            </p>
+            <span className="text-xs text-muted-foreground">
+              {metrics.classificationBenchmark}
+            </span>
+          </div>
+          <p
+            className={cn(
+              "text-lg font-bold mb-1",
+              metrics.classificationColor,
+            )}
+          >
             {metrics.classification}
           </p>
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            {metrics.monthlyIncome > 0
-              ? `${metrics.spendingRate.toFixed(1)}% of income`
-              : "Add income to calculate spending rate"}
+          <p className="text-sm text-muted-foreground mb-2">
+            {metrics.classificationDescription}
           </p>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Savings Rate</span>
+            <span className={cn("font-medium", metrics.classificationColor)}>
+              {savingsRate.toFixed(1)}%
+            </span>
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Survival Score</span>
+            <span className={cn("font-medium", metrics.classificationColor)}>
+              {metrics.classificationScore === null
+                ? "No score"
+                : `${metrics.classificationScore}/100`}
+            </span>
+          </div>
         </div>
+        {metrics.classificationReasons.length > 0 && (
+          <ul className="space-y-2 text-xs text-muted-foreground">
+            {metrics.classificationReasons.slice(0, 2).map((reason) => (
+              <li key={reason} className="rounded-md border p-2">
+                {reason}
+              </li>
+            ))}
+          </ul>
+        )}
       </CardContent>
     </Card>
   );
@@ -186,7 +231,7 @@ export function SmartRecommendationsCard({
       <CardContent>
         {recommendations.length === 0 ? (
           <div className={emptyStateClass}>
-            Add more transactions and budgets to unlock recommendations.
+            No additional recommendations right now.
           </div>
         ) : (
           <ul className="space-y-2">

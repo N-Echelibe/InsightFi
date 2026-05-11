@@ -47,9 +47,8 @@ import {
 } from "recharts";
 
 import { cn } from "@/lib/utils";
-import api from "@/lib/api";
+import api, { getSupabaseAccessToken } from "@/lib/api";
 import axios from "axios";
-import { supabase } from "@/lib/supabase";
 import {
   calculatePercentChange,
   formatPercentChange,
@@ -86,6 +85,12 @@ const categoryBreakdown = [
   { name: "Other", value: 300, color: "#6b7280" },
 ];
 
+const formatCurrency = (value: number) =>
+  `${"\u20a6"}${Math.round(value).toLocaleString("en-NG")}`;
+
+const formatCompactCurrency = (value: number) =>
+  `${"\u20a6"}${(value / 1000).toFixed(0)}k`;
+
 const netWorthHistory = [
   { month: "Jan", assets: 120000, liabilities: 45000, netWorth: 75000 },
   { month: "Feb", assets: 125000, liabilities: 44000, netWorth: 81000 },
@@ -114,18 +119,18 @@ const reportTypes = [
     description: "Analysis of your income sources and trends",
     icon: TrendingUp,
   },
-  {
-    id: "networth",
-    name: "Net Worth Report",
-    description: "Track your assets, liabilities, and net worth over time",
-    icon: BarChart3,
-  },
-  {
-    id: "tax",
-    name: "Tax Summary",
-    description: "Year-end summary for tax preparation",
-    icon: FileText,
-  },
+  // {
+  //   id: "networth",
+  //   name: "Net Worth Report",
+  //   description: "Track your assets, liabilities, and net worth over time",
+  //   icon: BarChart3,
+  // },
+  // {
+  //   id: "tax",
+  //   name: "Tax Summary",
+  //   description: "Year-end summary for tax preparation",
+  //   icon: FileText,
+  // },
 ];
 
 const reportRangeToComparisonRange: Record<string, ComparisonRange> = {
@@ -148,7 +153,9 @@ export default function ReportsPage() {
   const [dateRange, setDateRange] = useState("12m");
   const [reportType, setReportType] = useState("spending");
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
   const [summary, setSummary] = useState({
     totalIncome: 0,
     totalExpenses: 0,
@@ -241,6 +248,7 @@ export default function ReportsPage() {
               : categoryBreakdown[index % categoryBreakdown.length]?.color ?? "#6b7280",
           })),
         );
+        setHasLoadedOnce(true);
       } catch (error) {
         console.error(error);
         setHasError(true);
@@ -250,7 +258,7 @@ export default function ReportsPage() {
     };
 
     loadReports();
-  }, [dateRange, reportType]);
+  }, [dateRange, reloadTick, reportType]);
 
   const totalIncome = summary.totalIncome;
   const totalExpenses = summary.totalExpenses;
@@ -259,20 +267,18 @@ export default function ReportsPage() {
 
   const handleExport = async (format: "pdf" | "csv") => {
     if (format === "pdf") {
-      window.print();
+      // window.print();
       return;
     }
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const accessToken = await getSupabaseAccessToken();
     const response = await axios.post(
       `${process.env.NEXT_PUBLIC_API}/reports/export`,
       { format: "csv", range: dateRange, type: reportType },
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         responseType: "blob",
       },
@@ -286,7 +292,7 @@ export default function ReportsPage() {
     URL.revokeObjectURL(url);
   };
 
-  if (isLoading) {
+  if (isLoading && !hasLoadedOnce) {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -386,6 +392,7 @@ export default function ReportsPage() {
           onRetry={() => {
             setHasError(false);
             setIsLoading(true);
+            setReloadTick((value) => value + 1);
           }}
         />
       </div>
@@ -424,20 +431,20 @@ export default function ReportsPage() {
             <FileSpreadsheet className="h-4 w-4" />
             CSV
           </Button>
-          <Button
+          {/* <Button
             className="min-w-0 flex-1 gap-2 sm:flex-none"
             onClick={() => handleExport("pdf")}
           >
             <Download className="h-4 w-4" />
             PDF
-          </Button>
+          </Button> */}
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
           title="Total Income"
-          value={`$${totalIncome.toLocaleString()}`}
+          value={formatCurrency(totalIncome)}
           change={formatPercentChange(
             trendComparison.incomeChange,
             trendComparison.label
@@ -448,7 +455,7 @@ export default function ReportsPage() {
         />
         <StatCard
           title="Total Expenses"
-          value={`$${totalExpenses.toLocaleString()}`}
+          value={formatCurrency(totalExpenses)}
           change={formatPercentChange(
             trendComparison.expensesChange,
             trendComparison.label
@@ -459,7 +466,7 @@ export default function ReportsPage() {
         />
         <StatCard
           title="Total Savings"
-          value={`$${totalSavings.toLocaleString()}`}
+          value={formatCurrency(totalSavings)}
           change={formatPercentChange(
             trendComparison.savingsChange,
             trendComparison.label
@@ -554,7 +561,7 @@ export default function ReportsPage() {
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis
                       tick={{ fontSize: 12 }}
-                      tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                      tickFormatter={formatCompactCurrency}
                     />
                     <Tooltip
                       contentStyle={{
@@ -562,7 +569,7 @@ export default function ReportsPage() {
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                       }}
-                      formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
+                      formatter={(value: number) => [formatCurrency(value), ""]}
                     />
                     <Legend />
                     <Area
@@ -594,7 +601,7 @@ export default function ReportsPage() {
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis
                       tick={{ fontSize: 12 }}
-                      tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                      tickFormatter={formatCompactCurrency}
                     />
                     <Tooltip
                       contentStyle={{
@@ -602,7 +609,7 @@ export default function ReportsPage() {
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                       }}
-                      formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
+                      formatter={(value: number) => [formatCurrency(value), ""]}
                     />
                     <Legend />
                     <Bar dataKey="income" fill="#22c55e" radius={[4, 4, 0, 0]} name="Income" />
@@ -644,7 +651,7 @@ export default function ReportsPage() {
                       border: "1px solid hsl(var(--border))",
                       borderRadius: "8px",
                     }}
-                    formatter={(value: number) => [`$${value}`, ""]}
+                    formatter={(value: number) => [formatCurrency(value), ""]}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -659,7 +666,7 @@ export default function ReportsPage() {
                     />
                     <span className="text-sm">{item.name}</span>
                   </div>
-                  <span className="text-sm font-medium">${item.value}</span>
+                  <span className="text-sm font-medium">{formatCurrency(item.value)}</span>
                 </div>
               ))}
             </div>
@@ -706,13 +713,13 @@ export default function ReportsPage() {
                     >
                       <td className="py-3 px-4 font-medium">{month.month} 2024</td>
                       <td className="py-3 px-4 text-right text-success">
-                        +${month.income.toLocaleString()}
+                        +{formatCurrency(month.income)}
                       </td>
                       <td className="py-3 px-4 text-right text-destructive">
-                        -${month.expenses.toLocaleString()}
+                        -{formatCurrency(month.expenses)}
                       </td>
                       <td className="py-3 px-4 text-right font-medium">
-                        ${month.savings.toLocaleString()}
+                        {formatCurrency(month.savings)}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <Badge

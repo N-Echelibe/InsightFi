@@ -44,7 +44,16 @@ import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { BudgetDialog } from "@/components/budgets/budget-dialog";
 
-type BudgetPeriod = "daily" | "weekly" | "monthly" | "yearly" | "onetime" | "custom";
+type BudgetPeriod =
+  | "daily"
+  | "weekly"
+  | "monthly"
+  | "yearly"
+  | "semester_1"
+  | "semester_2"
+  | "academic_period"
+  | "onetime"
+  | "custom";
 type BudgetStatus = "safe" | "warning" | "over";
 
 type BudgetDetail = {
@@ -245,6 +254,9 @@ const periodLabels: Record<BudgetPeriod, string> = {
   weekly: "Weekly budget",
   monthly: "Monthly budget",
   yearly: "Yearly budget",
+  semester_1: "First semester budget",
+  semester_2: "Second semester budget",
+  academic_period: "Academic period budget",
   onetime: "One-time budget",
   custom: "Custom budget",
 };
@@ -308,7 +320,11 @@ function getStatusConfig(status: BudgetStatus) {
 }
 
 function getPeriodLength(budget: BudgetDetail) {
-  if ((budget.type === "custom" || budget.type === "onetime") && budget.startDate && budget.endDate) {
+  if (
+    ["custom", "onetime", "semester_1", "semester_2", "academic_period"].includes(budget.type) &&
+    budget.startDate &&
+    budget.endDate
+  ) {
     return Math.max(
       1,
       Math.ceil((budget.endDate.getTime() - budget.startDate.getTime()) / dayMs)
@@ -433,6 +449,7 @@ export default function BudgetDetailPage() {
   const router = useRouter();
   const params = useParams();
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [budget, setBudget] = useState<BudgetDetail | null>(null);
@@ -482,13 +499,14 @@ export default function BudgetDetailPage() {
           transactionsResponse.transactions.map((transaction) => ({
             id: transaction.id,
             title: transaction.description,
-            amount: Number(transaction.amount),
+            amount: Number(transaction.amount) + Math.max(Number(transaction.fee_amount ?? 0), 0),
             date: transaction.date,
             category: transaction.categories?.name ?? "Uncategorized",
             account: transaction.accounts?.name ?? "Account",
           })),
         );
         setCategories(categoriesResponse.categories);
+        setHasLoadedOnce(true);
       } catch (error) {
         console.error(error);
         setHasError(true);
@@ -616,7 +634,7 @@ export default function BudgetDetailPage() {
     router.push("/budgets");
   };
 
-  if (isLoading) {
+  if (isLoading && !hasLoadedOnce) {
     return <BudgetDetailSkeleton />;
   }
 

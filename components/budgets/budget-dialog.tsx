@@ -38,7 +38,7 @@ interface Budget {
   spent: number;
   budget: number;
   alerts: boolean;
-  type?: "daily" | "weekly" | "monthly" | "yearly" | "onetime" | "custom";
+  type?: "daily" | "weekly" | "monthly" | "yearly" | "semester_1" | "semester_2" | "academic_period" | "onetime" | "custom";
   startDate?: Date;
   endDate?: Date;
   createdDate?: Date;
@@ -74,7 +74,7 @@ export function BudgetDialog({
   const [alertEnabled, setAlertEnabled] = useState(true);
   const [alertThreshold, setAlertThreshold] = useState([80]);
   const [budgetType, setBudgetType] = useState<
-    "daily" | "weekly" | "monthly" | "yearly" | "onetime" | "custom"
+    "daily" | "weekly" | "monthly" | "yearly" | "semester_1" | "semester_2" | "academic_period" | "onetime" | "custom"
   >("monthly");
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
@@ -103,7 +103,9 @@ export function BudgetDialog({
   const handleSubmit = async () => {
     if (!category || !amount) return;
 
-    const isCustomRange = budgetType === "onetime" || budgetType === "custom";
+    const isCustomRange = ["onetime", "custom", "semester_1", "semester_2", "academic_period"].includes(budgetType);
+
+    if (isCustomRange && (!startDate || !endDate)) return;
 
     try {
       setIsSaving(true);
@@ -165,6 +167,9 @@ export function BudgetDialog({
                 <SelectItem value="daily">Daily Recurring</SelectItem>
                 <SelectItem value="weekly">Weekly Recurring</SelectItem>
                 <SelectItem value="monthly">Monthly Recurring</SelectItem>
+                <SelectItem value="semester_1">First Semester</SelectItem>
+                <SelectItem value="semester_2">Second Semester</SelectItem>
+                <SelectItem value="academic_period">Custom Academic Period</SelectItem>
                 <SelectItem value="yearly">Yearly Recurring</SelectItem>
                 <SelectItem value="custom">Custom Range</SelectItem>
                 <SelectItem value="onetime">One-Time</SelectItem>
@@ -177,6 +182,9 @@ export function BudgetDialog({
               {budgetType === "daily" && "Daily Budget"}
               {budgetType === "weekly" && "Weekly Budget"}
               {budgetType === "monthly" && "Monthly Budget"}
+              {budgetType === "semester_1" && "First Semester Budget"}
+              {budgetType === "semester_2" && "Second Semester Budget"}
+              {budgetType === "academic_period" && "Academic Period Budget"}
               {budgetType === "yearly" && "Yearly Budget"}
               {(budgetType === "onetime" || budgetType === "custom") && "Total Budget"}
             </Label>
@@ -195,7 +203,7 @@ export function BudgetDialog({
             </div>
           </div>
 
-          {(budgetType === "onetime" || budgetType === "custom") && (
+          {["onetime", "custom", "semester_1", "semester_2", "academic_period"].includes(budgetType) && (
             <>
               <div className="grid gap-2">
                 <Label>Start Date</Label>

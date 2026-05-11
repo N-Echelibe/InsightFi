@@ -119,7 +119,7 @@ export default function SignupPage() {
       return
     }
 
-    if (data.user?.id) {
+    if (data.user?.id && data.session) {
       const { error: profileError } = await supabase.from('profiles').upsert(
         {
           user_id: data.user.id,

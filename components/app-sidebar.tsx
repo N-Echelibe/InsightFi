@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Target,
   Wallet,
+  WalletCards,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -33,6 +34,11 @@ const navItems = [
     title: "Budgets",
     href: "/budgets",
     icon: PiggyBank,
+  },
+  {
+    title: "Allowance",
+    href: "/allowance",
+    icon: WalletCards,
   },
   {
     title: "Goals",
@@ -78,7 +84,7 @@ export function AppSidebar() {
         </div>
         {!collapsed && (
           <span className="font-semibold text-lg text-sidebar-foreground">
-            FinanceAI
+            InsightFi
           </span>
         )}
       </div>

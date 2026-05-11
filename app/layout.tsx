@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FinanceAI - Smart Personal Finance",
+  title: "InsightFi - Smart Personal Finance",
   description:
-    "AI-powered personal finance management with intelligent budgeting, investment tracking, and financial insights.",
+    "Personal finance management with intelligent budgeting, and financial insights.",
   generator: "v0.app",
   icons: {
     icon: [

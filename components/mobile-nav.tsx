@@ -12,6 +12,7 @@ import {
   Settings,
   Target,
   Wallet,
+  WalletCards,
 } from "lucide-react";
 
 const navItems = [
@@ -29,6 +30,11 @@ const navItems = [
     title: "Budgets",
     href: "/budgets",
     icon: PiggyBank,
+  },
+  {
+    title: "Allowance",
+    href: "/allowance",
+    icon: WalletCards,
   },
   {
     title: "Goals",
@@ -62,7 +68,7 @@ export function MobileNav() {
           <Wallet className="h-5 w-5" />
         </div>
         <span className="font-semibold text-lg text-sidebar-foreground">
-          FinanceAI
+          InsightFi
         </span>
       </div>
 

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { MfaChallenge } from '@/components/auth/mfa-challenge'
 import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
@@ -22,10 +23,17 @@ export default function LoginPage() {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
+  const [mfaRequired, setMfaRequired] = useState(false)
   const [submitMessage, setSubmitMessage] = useState<{
     type: 'success' | 'error'
     text: string
   } | null>(null)
+
+  const completeSignIn = () => {
+    const nextPath = new URLSearchParams(window.location.search).get('next')
+    router.replace(nextPath || '/')
+    router.refresh()
+  }
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -81,9 +89,34 @@ export default function LoginPage() {
       return
     }
 
-    const nextPath = new URLSearchParams(window.location.search).get('next')
-    router.replace(nextPath || '/')
-    router.refresh()
+    const { data, error: aalError } = await (supabase.auth.mfa as any)
+      .getAuthenticatorAssuranceLevel()
+
+    if (aalError) {
+      setSubmitMessage({ type: 'error', text: aalError.message })
+      setIsLoading(false)
+      return
+    }
+
+    if (data?.nextLevel === 'aal2' && data.nextLevel !== data.currentLevel) {
+      setMfaRequired(true)
+      setIsLoading(false)
+      return
+    }
+
+    completeSignIn()
+  }
+
+  if (mfaRequired) {
+    return (
+      <MfaChallenge
+        onVerified={completeSignIn}
+        onCancel={async () => {
+          await supabase.auth.signOut()
+          setMfaRequired(false)
+        }}
+      />
+    )
   }
 
   return (
